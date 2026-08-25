@@ -6,7 +6,7 @@ parser. No implementation code ships with this document. Signatures, CMake calls
 
 | Field | Value |
 | --- | --- |
-| Status | Approved. P0 done, P1 next. |
+| Status | Approved. P0 and P1 done, P2 next. |
 | Upstream | `ada-url/ada` v4.0.0, pinned by tag |
 | ABI reference | `include/ada_c.h` at v4.0.0, captured in section 3.1 |
 | Target framework | `net10.0` only. No conditional compilation. See ADR-0001. |
@@ -1044,9 +1044,8 @@ leg, and the no `#if` grep), `packaging` (pack, Alpine container test, NativeAOT
 test), `analyze` (CodeQL), and `deps` (dependency review at `fail-on-severity: high`, per org
 standard).
 
-The live file is `.github/workflows/ci.yml`. It currently runs the managed jobs only. The
-`natives`, ABI, and packaging jobs are marked with `TODO(P1)` and `TODO(P2)` and land with the
-native build.
+The live file is `.github/workflows/ci.yml`. The `natives` job and the native download are
+wired. The ABI leg lands with P2 and the packaging job with P4, both marked with a TODO.
 
 Branch protection on `main`: require `build-test` on all matrix legs,
 `packaging`, `analyze`, and `deps`. One approval, two for changes under `src/Ada.Url/Interop/` or
@@ -1145,8 +1144,8 @@ ada-csharp/
 | Phase | Deliverable | Exit |
 | --- | --- | --- |
 | **P0** done | git init, repo skeleton, build props, editorconfig, `ci.yml`, README, ADR-0001 to ADR-0005 | CI green on the scaffold, lint gate live, ADR-0005 approved |
-| **P1** next | `native.yml` producing all six RIDs from v4.0.0, export, hardening, and checksum gates, simdutf measurement feeding ADR-0003 | AC-2.1 to AC-2.4, AC-2.6 |
-| **P2** | Full `AdaNative` surface, blittable structs, ABI suite, handle free statics, `AdaUrl` ref struct | AC-1.3, AC-3.1 to AC-3.5, AC-4.6 |
+| **P1** done | `native.yml` producing all six RIDs from v4.0.0, export, hardening, and checksum gates. The simdutf measurement feeding ADR-0003 is still outstanding. | AC-2.1 to AC-2.4, AC-2.6 |
+| **P2** next | Full `AdaNative` surface, blittable structs, ABI suite, handle free statics, `AdaUrl` ref struct | AC-1.3, AC-3.1 to AC-3.5, AC-4.6 |
 | **P3** | WPT corpus adapter, categories 1 to 21, `SafeHandle`, `AdaSearchParams`, `AdaIdna`, parity tests, ASAN and soak lanes | AC-1.2, AC-4.1 to AC-4.5, AC-4.7, AC-4.8 |
 | **P4** | Benchmarks W1 to W4 in three tiers, packaging, Alpine and NativeAOT tests, signing, SBOM, runbook, `release.yml` | AC-1.1, AC-1.4, AC-1.5, AC-2.5, AC-2.7, AC-5.1 to AC-5.8 |
 

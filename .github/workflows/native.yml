@@ -1,0 +1,127 @@
+name: native
+
+# Builds the Ada shared library for every shipped RID.
+#
+# Reusable, and cached on the upstream tag plus the hash of native/. PR CI calls this and
+# normally gets a cache hit, so a pull request does not pay for a C++ build.
+
+on:
+  workflow_call:
+    inputs:
+      ada-tag:
+        type: string
+        default: v4.0.0
+  workflow_dispatch:
+    inputs:
+      ada-tag:
+        type: string
+        default: v4.0.0
+
+permissions:
+  contents: read
+
+env:
+  ADA_TAG: ${{ inputs.ada-tag || 'v4.0.0' }}
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,        os: windows-2022     }
+          - { rid: linux-x64,      os: ubuntu-24.04     }
+          - { rid: linux-arm64,    os: ubuntu-24.04-arm }
+          - { rid: linux-musl-x64, os: ubuntu-24.04     }
+          - { rid: osx-x64,        os: macos-13         }
+          - { rid: osx-arm64,      os: macos-14         }
+    steps:
+      # TODO: pin these to full commit SHAs before the first release.
+      - uses: actions/checkout@v4
+
+      - name: compute cache key
+        id: key
+        shell: bash
+        run: echo "k=native-${ADA_TAG}-${{ matrix.rid }}-${{ hashFiles('native/**') }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: artifacts/native/${{ matrix.rid }}
+          key: ${{ steps.key.outputs.k }}
+
+      - name: install build tools (linux)
+        if: steps.cache.outputs.cache-hit != 'true' && startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang lld llvm cmake
+
+      - name: install build tools (macos)
+        if: steps.cache.outputs.cache-hit != 'true' && startsWith(matrix.os, 'macos')
+        run: brew install ninja cmake
+
+      - name: build (unix)
+        if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
+        shell: bash
+        run: |
+          case "${{ matrix.rid }}" in
+            linux-musl-x64) ./native/build-musl.sh  --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
+            linux-*)        ./native/build-linux.sh --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
+            osx-*)          ./native/build-macos.sh --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
+          esac
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+
+      - name: build (windows)
+        if: steps.cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: ./native/build-windows.ps1 -AdaTag $env:ADA_TAG -Rid '${{ matrix.rid }}'
+
+      # A library that builds but exports nothing is the silent failure of this workflow, so the
+      # export check is a gate rather than a report.
+      - name: verify exports and hardening (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./native/verify-unix.sh artifacts/native/${{ matrix.rid }}
+
+      - name: verify exports and hardening (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./native/verify-windows.ps1 artifacts/native/${{ matrix.rid }}
+
+      - name: checksum
+        shell: bash
+        run: ./native/checksum.sh artifacts/native/${{ matrix.rid }} | tee checksums-${{ matrix.rid }}.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: |
+            artifacts/native/${{ matrix.rid }}/*
+            !artifacts/native/${{ matrix.rid }}/*.unstripped
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checksums-${{ matrix.rid }}
+          path: checksums-${{ matrix.rid }}.txt
+          retention-days: 7
+
+  manifest:
+    # Collects the per RID lines into one file. The pack step verifies against the committed
+    # native/CHECKSUMS.txt, so a swapped binary breaks the build instead of shipping.
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: checksums-*
+          path: sums
+          merge-multiple: true
+      - name: combine
+        run: cat sums/*.txt | sort -k2 | tee CHECKSUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: CHECKSUMS.txt
+          retention-days: 7

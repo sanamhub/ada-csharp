@@ -11,6 +11,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   P/Invoke architecture, conformance testing, benchmarks, and CI.
 - Repository scaffold: solution, library and test projects on `net10.0`, central package
   management, analyzer and lint gates, `ci.yml`, and ADR-0001 through ADR-0005.
+- Native build for all six RIDs: build scripts for Windows, Linux, Alpine, and macOS, plus
+  `native.yml` with export, hardening, and checksum gates.
 
 ### Notes
 

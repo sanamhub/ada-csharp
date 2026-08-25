@@ -20,8 +20,12 @@ env:
   CI: 'true'
 
 jobs:
+  natives:
+    uses: ./.github/workflows/native.yml
+
   build-test:
     name: build+test (${{ matrix.rid }})
+    needs: natives
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -38,9 +42,11 @@ jobs:
         with:
           global-json-file: global.json
 
-      # TODO(P1): download natives from .github/workflows/native.yml once it exists.
-      #   - uses: actions/download-artifact@v4
-      #     with: { name: native-${{ matrix.rid }}, path: artifacts/native/${{ matrix.rid }} }
+      - name: download native
+        uses: actions/download-artifact@v4
+        with:
+          name: native-${{ matrix.rid }}
+          path: artifacts/native/${{ matrix.rid }}
 
       - name: restore
         run: dotnet restore
