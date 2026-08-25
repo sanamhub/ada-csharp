@@ -1,0 +1,34 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+out/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+# Test / coverage
+TestResults/
+coverage*.xml
+coverage*.json
+*.coverage
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# Native build trees and binaries.
+# Natives are CI artifacts (see ADA_WRAPPER_PLAN.md section 2.6). Only CHECKSUMS.txt is tracked.
+native/ada-src/
+native/build/
+*.dll
+*.so
+*.so.*
+*.dylib
+*.pdb
+*.lib
+*.exp
+
+# Local scratch
+logs/

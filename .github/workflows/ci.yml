@@ -1,0 +1,110 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege by default; jobs opt into more.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  CI: 'true'
+
+jobs:
+  build-test:
+    name: build+test (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022,     rid: win-x64     }
+          - { os: ubuntu-24.04,     rid: linux-x64   }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
+          - { os: macos-14,         rid: osx-arm64   }
+    steps:
+      # TODO(P1): pin third-party actions by full commit SHA (org section 7 supply chain).
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # TODO(P1): download natives from .github/workflows/native.yml once it exists.
+      #   - uses: actions/download-artifact@v4
+      #     with: { name: native-${{ matrix.rid }}, path: artifacts/native/${{ matrix.rid }} }
+
+      - name: restore
+        run: dotnet restore
+
+      # TreatWarningsAsErrors + AnalysisLevel=latest-all makes this the lint gate too.
+      - name: build
+        run: dotnet build -c Release --no-restore
+
+      - name: test
+        run: >
+          dotnet test -c Release --no-build
+          --filter "Category!=Stress"
+          --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      # AC-1.2: zero conditional compilation in the repository (single TFM, ADR-0001).
+      - name: assert no conditional compilation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if grep -rn --include='*.cs' -E '^\s*#(if|else|elif|endif)\b' src tests; then
+            echo "::error::#if found. ADR-0001 requires zero conditional compilation."
+            exit 1
+          fi
+
+      - name: upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.rid }}
+          path: TestResults
+          retention-days: 7
+
+  # TODO(P2): add a `Category=Abi` leg here. It is the per-RID ship gate (plan section 4.5).
+  # TODO(P4): add `packaging` (Alpine + NativeAOT consumption) once natives exist.
+
+  analyze:
+    name: codeql
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+      - run: dotnet build -c Release
+      - uses: github/codeql-action/analyze@v3
+
+  deps:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      # Org section 7: critical/high blocks merge without a recorded risk decision.
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

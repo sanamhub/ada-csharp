@@ -1,0 +1,30 @@
+THIRD-PARTY NOTICES
+===================
+
+This package redistributes native binaries built from third-party source.
+
+
+1. Ada URL parser  (ada-url/ada)
+--------------------------------
+Upstream:  https://github.com/ada-url/ada
+Version:   v4.0.0 (pinned; see Directory.Build.props / AdaUrlUpstreamTag)
+License:   Apache-2.0 OR MIT  (dual-licensed; this project relies on the MIT option)
+
+The files runtimes/<rid>/native/ada.dll, libada.so and libada.dylib in this package
+are compiled from unmodified Ada v4.0.0 sources. Build flags and CMake invocations are
+recorded in native/ and in ADA_WRAPPER_PLAN.md section 2.
+
+Full license text: https://github.com/ada-url/ada/blob/v4.0.0/LICENSE-MIT
+
+
+2. simdutf  (simdutf/simdutf)
+-----------------------------
+Upstream:  https://github.com/simdutf/simdutf
+License:   Apache-2.0 OR MIT
+
+Included transitively when Ada is configured with ADA_USE_SIMDUTF=ON. simdutf provides
+the runtime-dispatched SIMD kernels described in ADA_WRAPPER_PLAN.md section 2.2.
+
+
+An SPDX/CycloneDX SBOM covering both components is published with every release
+(ADA_WRAPPER_PLAN.md section 2.6).

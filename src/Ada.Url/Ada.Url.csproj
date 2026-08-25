@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Ada.Url</RootNamespace>
+    <AssemblyName>Ada.Url</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <IsPackable>true</IsPackable>
+    <PackageId>Ada.Url</PackageId>
+    <Version>0.1.0-alpha.1</Version>
+    <Description>Zero-allocation .NET wrapper around the Ada WHATWG-compliant URL parser.</Description>
+    <PackageTags>url;uri;whatwg;parser;ada;idna;performance</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!--
+    Native assets are added at P1 by native.yml (ADA_WRAPPER_PLAN.md §2.5):
+      <None Include="$(NativeRoot)win-x64\ada.dll" Pack="true"
+            PackagePath="runtimes/win-x64/native/" CopyToOutputDirectory="PreserveNewest" />
+    ... one line per RID. Not present yet, so this package is managed-only until P1 lands.
+  -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ada.Url.Tests" />
+  </ItemGroup>
+
+</Project>

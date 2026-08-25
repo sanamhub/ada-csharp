@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ada.Url/Ada.Url.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ada.Url.Tests/Ada.Url.Tests.csproj" />
+  </Folder>
+</Solution>
