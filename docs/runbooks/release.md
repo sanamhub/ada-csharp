@@ -39,7 +39,7 @@ That triggers `release.yml`:
 | `natives` | Builds all six native libraries from the pinned upstream Ada tag. |
 | `verify` | Packs with the completeness gate active and consumes the package from a clean project on five platforms, Alpine included. |
 | `publish` | Waits on the `production` environment approval, then verifies checksums, packs, builds the SBOM, pushes to nuget.org, and creates the GitHub release. |
-| `verify published` | Fires on the release. Waits for nuget.org validation, then installs the package from the live feed on five platforms. |
+| `verify published` | Called by `release.yml` after `publish`. Waits for nuget.org validation, then installs the package from the live feed on five platforms. |
 
 Approve the deployment at the run's page, under `publish`, `Review deployments`.
 
@@ -69,8 +69,12 @@ bad version.
 
 1. Read the release page. Confirm the notes match the changelog and that the nupkg, snupkg and
    SBOM are attached.
-2. Watch `verify published`. Publishing the release triggers it, and it installs the package from
-   nuget.org on Linux x64, Linux arm64, Alpine, macOS arm64 and Windows.
+2. Watch `verify published`. It runs after `publish` and installs the package from nuget.org on
+   Linux x64, Linux arm64, Alpine, macOS arm64 and Windows.
+
+   It is called by `release.yml`, not triggered by the release event. A release created by a
+   workflow using `GITHUB_TOKEN` does not start new workflow runs, so an `on: release` trigger
+   here looks correct and never fires.
 
    Expect it to sit waiting. nuget.org validates and indexes a new package before anything can
    restore it, and documents that as taking up to an hour, so a package that is live on the site

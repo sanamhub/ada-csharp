@@ -318,3 +318,12 @@ jobs:
             out/*.nupkg
             out/*.snupkg
             sbom/*
+
+  # Runs after the release exists, so a slow nuget.org cannot delay or block it. Called rather
+  # than triggered: a release created with GITHUB_TOKEN does not fire the release event.
+  verify-published:
+    needs: publish
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/verify-published.yml
+    with:
+      version: ${{ github.ref_name }}
