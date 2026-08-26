@@ -12,7 +12,7 @@ the public API has had no outside use yet and may still move.
 
 ### Added
 
-- Engineering plan (`ADA_WRAPPER_PLAN.md`) covering framework targeting, native build,
+- Engineering plan (`docs/ADA_PLAN.md`) covering framework targeting, native build,
   P/Invoke architecture, conformance testing, benchmarks, and CI.
 - Repository scaffold: solution, library and test projects on `net10.0`, central package
   management, analyzer and lint gates, `ci.yml`, and ADR-0001 through ADR-0005.

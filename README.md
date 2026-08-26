@@ -37,8 +37,9 @@ The bolded row is the security one. Each of those 32 is an input `System.Uri` ac
 browsers, Node, Go and Python all refuse. Code that validates a URL with one parser and then
 fetches it with another has an exploitable gap exactly there.
 
-Every case is listed in `docs/system-uri-differences.md`, generated from the corpus by a test
-rather than written by hand.
+All 186 are listed in
+[`docs/system-uri-differences.md`](docs/system-uri-differences.md), generated from the corpus by
+a test rather than written by hand, so it cannot drift from what the parsers actually do.
 
 ## Install
 
@@ -97,12 +98,12 @@ AdaIdna.ToUnicode("xn--bcher-kva.example");   // bücher.example
 
 `https://example.com/path`
 
-| What you are doing | Ada.Url | `System.Uri` | | Allocated |
+| Call | Ada.Url | `System.Uri` | Speed | Allocated |
 | --- | ---: | ---: | --- | --- |
-| Check it is a valid URL | **47 ns** | 185 ns | 3.9x faster | 0 B against 288 B |
-| Parse, read host, path and query | **92 ns** | 185 ns | 2.0x faster | 0 B against 288 B |
-| Parse, read all ten components | **101 ns** | 185 ns | 1.8x faster | 0 B against 288 B |
-| Parse, return the URL as a `string` | **122 ns** | 185 ns | 1.5x faster | 72 B against 288 B |
+| `AdaUrl.CanParse(utf8)` | **47 ns** | 185 ns | 3.9x faster | **0 B** against 288 B |
+| `AdaUrl.TryParse(utf8, out url)` then 3 spans | **92 ns** | 185 ns | 2.0x faster | **0 B** against 288 B |
+| `AdaUrl.TryParse(utf8, out url)` then all 10 | **101 ns** | 185 ns | 1.8x faster | **0 B** against 288 B |
+| `AdaUrl.TryParse(utf8, out url)` then `GetString` | **122 ns** | 185 ns | 1.5x faster | 72 B against 288 B |
 
 The first three rows allocate **nothing at all**. Not less, none.
 
@@ -111,11 +112,11 @@ The first three rows allocate **nothing at all**. Not less, none.
 Credentials, a non default port, an internationalised host, dot segments and a heavy percent
 encoded query:
 
-| What you are doing | Ada.Url | `System.Uri` | | Allocated |
+| Call | Ada.Url | `System.Uri` | Speed | Allocated |
 | --- | ---: | ---: | --- | --- |
-| Normalise into your own buffer | **1,134 ns** | 1,684 ns | 1.5x faster | 0 B against 2,160 B |
-| Parse and read four components | **1,139 ns** | 1,684 ns | 1.5x faster | 0 B against 2,160 B |
-| Parse and return a `string` | **1,374 ns** | 1,684 ns | 1.2x faster | 392 B against 2,160 B |
+| `AdaUrl.TryNormalize(utf8, buffer, out n)` | **1,134 ns** | 1,684 ns | 1.5x faster | **0 B** against 2,160 B |
+| `AdaUrl.TryParse(utf8, out url)` then 4 spans | **1,139 ns** | 1,684 ns | 1.5x faster | **0 B** against 2,160 B |
+| `AdaUrl.TryParse(utf8, out url)` then `GetString` | **1,374 ns** | 1,684 ns | 1.2x faster | 392 B against 2,160 B |
 
 Both parsers slow down here, because IDNA and percent decoding are genuinely expensive. The gap
 that widens is allocation: **2,160 bytes against nothing**.
@@ -182,10 +183,20 @@ routinely carry credentials in `username` and `password`.
 
 ## Conformance
 
-874 WHATWG parse cases and 278 setter cases from the
-[web-platform-tests](https://github.com/web-platform-tests/wpt) corpus, pinned at a known commit,
-passing on Linux x64, Linux arm64, macOS arm64 and Windows x64. That includes the 267 inputs the
-standard says must be **rejected**.
+Tested against the [web-platform-tests](https://github.com/web-platform-tests/wpt) URL corpus,
+the same suite browsers are held to, pinned at a known commit.
+
+| | Cases | Result |
+| --- | ---: | --- |
+| URLs that must parse | 607 | all pass |
+| URLs that must be **rejected** | 267 | all rejected |
+| Setter behaviour | 278 | all pass |
+| **Total** | **1,152** | **all pass** |
+
+Verified on Linux x64, Linux arm64, macOS arm64 and Windows x64, every commit.
+
+The rejection row is the one worth noticing. Accepting a malformed URL is the failure mode that
+turns into a security bug, and it is the half of a specification that is easy to skip.
 
 ## Build
 
@@ -201,7 +212,7 @@ a C++ toolchain and CMake.
 
 | File | Contents |
 | --- | --- |
-| [`ADA_WRAPPER_PLAN.md`](ADA_WRAPPER_PLAN.md) | Framework targeting, native build, interop architecture, test strategy, benchmarks, CI |
+| [`docs/ADA_PLAN.md`](docs/ADA_PLAN.md) | Framework targeting, native build, interop architecture, test strategy, benchmarks, CI |
 | [`docs/adr/`](docs/adr) | Architecture decision records |
 | [`docs/system-uri-differences.md`](docs/system-uri-differences.md) | Every disagreement with `System.Uri` |
 | [`docs/runbooks/release.md`](docs/runbooks/release.md) | Release and rollback |

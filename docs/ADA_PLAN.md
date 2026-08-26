@@ -1102,11 +1102,12 @@ the gate.
 
 ```
 ada-csharp/
-  ADA_WRAPPER_PLAN.md  README.md  CHANGELOG.md  LICENSE  THIRD-PARTY-NOTICES.txt
+  README.md  CHANGELOG.md  LICENSE  THIRD-PARTY-NOTICES.txt  NuGet.Config
   Directory.Build.props  Directory.Packages.props  global.json
   .editorconfig  .gitattributes  .gitignore  Ada.Url.slnx
   .claude/skills/writing-style/     house writing rules
   docs/
+    ADA_PLAN.md                     this document
     adr/                            ADR-0001 to ADR-0005
     benchmarks/{version}/
     runbooks/release.md

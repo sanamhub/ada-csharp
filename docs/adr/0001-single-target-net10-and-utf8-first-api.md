@@ -43,7 +43,7 @@ only ever quoted for the span in, span out tier.
 
 ## Alternatives considered
 
-**net10.0 plus netstandard2.0.** Rejected. The full analysis stays in `ADA_WRAPPER_PLAN.md`
+**net10.0 plus netstandard2.0.** Rejected. The full analysis stays in `docs/ADA_PLAN.md`
 section 1 and doubles as the contingency plan if a .NET Framework consumer appears. It would
 land behind the modern path, never in front of it, or its constraints leak into the primary API
 design.
