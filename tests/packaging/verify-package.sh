@@ -50,6 +50,9 @@ cat > consumer.csproj <<XML
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <!-- Set explicitly. This project lives in a temp directory on purpose, so it inherits none
+         of the repository's Directory.Build.props and gets no defaults from it. -->
+    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Consumer</RootNamespace>
     <PublishAot>$AOT</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
