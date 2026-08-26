@@ -37,8 +37,8 @@ The bolded row is the security one. Each of those 32 is an input `System.Uri` ac
 browsers, Node, Go and Python all refuse. Code that validates a URL with one parser and then
 fetches it with another has an exploitable gap exactly there.
 
-Every case is listed in [`docs/system-uri-differences.md`](docs/system-uri-differences.md),
-generated from the corpus rather than written by hand.
+Every case is listed in `docs/system-uri-differences.md`, generated from the corpus by a test
+rather than written by hand.
 
 ## Install
 

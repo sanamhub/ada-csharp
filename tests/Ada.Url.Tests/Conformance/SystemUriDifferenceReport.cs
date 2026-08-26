@@ -89,7 +89,12 @@ public class SystemUriDifferenceReport
         }
 
         string path = Path.Combine(AppContext.BaseDirectory, "system-uri-differences.md");
-        File.WriteAllText(path, Render(considered, agreed, adaOnly, uriOnly, bothParsed), Encoding.UTF8);
+        // Encoding.UTF8 emits a byte order mark, which renders as a stray character before the
+        // first heading. UTF8Encoding(false) does not.
+        File.WriteAllText(
+            path,
+            Render(considered, agreed, adaOnly, uriOnly, bothParsed),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
         // Surfaced in the test output so a CI run reports the shape without opening the artifact.
         Assert.True(
@@ -167,18 +172,52 @@ public class SystemUriDifferenceReport
         => string.Create(CultureInfo.InvariantCulture, $"| {label} | {value} |");
 
     /// <summary>Makes a corpus value safe to put in a markdown table cell.</summary>
-    private static string Cell(string value)
+    /// <remarks>
+    /// Emits an HTML code element rather than a backtick span. The corpus contains backticks, and
+    /// a backtick inside a backtick span closes it early and shreds the rest of the row. It also
+    /// contains backslashes, which are already literal inside a code span, so escaping them was
+    /// making the report show data the corpus does not contain.
+    /// </remarks>
+    internal static string Cell(string value)
     {
-        // The corpus deliberately contains tabs, newlines and pipes, all of which would break the
-        // table silently and make the report look shorter than it is.
-        string escaped = value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("|", "\\|", StringComparison.Ordinal)
-            .Replace("\r", "\\r", StringComparison.Ordinal)
-            .Replace("\n", "\\n", StringComparison.Ordinal)
-            .Replace("\t", "\\t", StringComparison.Ordinal);
+        if (value.Length == 0)
+        {
+            return "*(empty)*";
+        }
 
-        return escaped.Length == 0 ? "*(empty)*" : $"`{escaped}`";
+        var sb = new StringBuilder(value.Length + 16);
+        sb.Append("<code>");
+
+        foreach (char c in value)
+        {
+            switch (c)
+            {
+                case '&': sb.Append("&amp;"); break;
+                case '<': sb.Append("&lt;"); break;
+                case '>': sb.Append("&gt;"); break;
+                case '|': sb.Append("&#124;"); break;   // would end the table cell
+                case '`': sb.Append("&#96;"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\n': sb.Append("\\n"); break;
+                case '\t': sb.Append("\\t"); break;
+                default:
+                    // The corpus includes raw C0 controls. Written through, they would corrupt
+                    // the file rather than document anything.
+                    if (char.IsControl(c))
+                    {
+                        sb.Append(CultureInfo.InvariantCulture, $"\\u{(int)c:x4}");
+                    }
+                    else
+                    {
+                        sb.Append(c);
+                    }
+
+                    break;
+            }
+        }
+
+        sb.Append("</code>");
+        return sb.ToString();
     }
 
     private sealed record Divergence(string Input, string Ada, string Uri);
