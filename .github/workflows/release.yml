@@ -118,17 +118,34 @@ jobs:
 
       - name: verify checksums against the committed manifest
         shell: bash
+        # Absolute paths throughout. An earlier version cd'd around and then referenced the
+        # downloaded manifest relatively, which resolved to a path that does not exist, so a
+        # missing file reported itself as a checksum mismatch.
         run: |
-          cd artifacts/native
-          for d in native-*; do [ -d "$d" ] && mv "$d" "${d#native-}"; done
-          cd ..
-          if [ ! -f ../native/CHECKSUMS.txt ]; then
-            echo "::error::native/CHECKSUMS.txt is missing. A release cannot verify what it ships."
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE"
+          committed="$root/native/CHECKSUMS.txt"
+          produced="$root/manifest/CHECKSUMS.txt"
+
+          # download-artifact nests each artifact under its own name.
+          ( cd "$root/artifacts/native" && for d in native-*; do [ -d "$d" ] && mv "$d" "${d#native-}"; done )
+
+          for f in "$committed" "$produced"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::missing $f. A release cannot verify what it is about to ship."
+              exit 1
+            fi
+          done
+
+          echo "committed:"; cat "$committed"
+          echo "produced by this run:"; cat "$produced"
+
+          # A native binary that changed between the build and the pack breaks the release here
+          # rather than shipping.
+          if ! diff <(sort "$committed") <(sort "$produced"); then
+            echo "::error::native checksums do not match the committed manifest"
             exit 1
           fi
-          # Tampering with a native binary breaks the build here rather than shipping.
-          diff <(sort ../native/CHECKSUMS.txt) <(sort manifest/CHECKSUMS.txt) \
-            || { echo "::error::native checksums do not match the committed manifest"; exit 1; }
           echo "checksums match"
 
       - uses: actions/setup-dotnet@v6
