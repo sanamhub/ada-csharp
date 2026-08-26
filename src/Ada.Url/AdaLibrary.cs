@@ -8,7 +8,7 @@ namespace Ada.Url;
 /// </summary>
 public static class AdaLibrary
 {
-    /// <summary>The upstream ada-url/ada release this wrapper is built and tested against.</summary>
+    /// <summary>The upstream ada-url/ada release this library is built and tested against.</summary>
     public const string PinnedVersion = "4.0.0";
 
     /// <summary>The version string reported by the native library actually loaded.</summary>

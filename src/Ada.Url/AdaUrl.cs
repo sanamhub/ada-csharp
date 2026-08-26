@@ -107,7 +107,7 @@ public ref partial struct AdaUrl : IDisposable
         }
 
         // ada_parse hands back a handle even for input it could not parse, so it still has to be
-        // freed. Missing this is the most commonly overlooked leak path in a C wrapper.
+        // freed. Missing this is the most commonly overlooked leak path when binding a C API.
         if (!AdaNative.ToBool(AdaNative.IsValid(handle)))
         {
             AdaNative.Free(handle);
