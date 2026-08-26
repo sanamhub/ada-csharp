@@ -3,6 +3,7 @@ Ada.Url.AdaHostType
 Ada.Url.AdaHostType.Domain = 0 -> Ada.Url.AdaHostType
 Ada.Url.AdaHostType.IPv4 = 1 -> Ada.Url.AdaHostType
 Ada.Url.AdaHostType.IPv6 = 2 -> Ada.Url.AdaHostType
+Ada.Url.AdaIdna
 Ada.Url.AdaLibrary
 Ada.Url.AdaSchemeType
 Ada.Url.AdaSchemeType.File = 6 -> Ada.Url.AdaSchemeType
@@ -12,6 +13,27 @@ Ada.Url.AdaSchemeType.Https = 2 -> Ada.Url.AdaSchemeType
 Ada.Url.AdaSchemeType.NotSpecial = 1 -> Ada.Url.AdaSchemeType
 Ada.Url.AdaSchemeType.Ws = 3 -> Ada.Url.AdaSchemeType
 Ada.Url.AdaSchemeType.Wss = 5 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSearchParams
+Ada.Url.AdaSearchParams.AdaSearchParams() -> void
+Ada.Url.AdaSearchParams.Append(System.ReadOnlySpan<byte> utf8Key, System.ReadOnlySpan<byte> utf8Value) -> void
+Ada.Url.AdaSearchParams.Count.get -> int
+Ada.Url.AdaSearchParams.Dispose() -> void
+Ada.Url.AdaSearchParams.Entry
+Ada.Url.AdaSearchParams.Entry.Entry() -> void
+Ada.Url.AdaSearchParams.Entry.Key.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaSearchParams.Entry.Value.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaSearchParams.Enumerator
+Ada.Url.AdaSearchParams.Enumerator.Current.get -> Ada.Url.AdaSearchParams.Entry
+Ada.Url.AdaSearchParams.Enumerator.Dispose() -> void
+Ada.Url.AdaSearchParams.Enumerator.Enumerator() -> void
+Ada.Url.AdaSearchParams.Enumerator.MoveNext() -> bool
+Ada.Url.AdaSearchParams.Get(System.ReadOnlySpan<byte> utf8Key) -> System.ReadOnlySpan<byte>
+Ada.Url.AdaSearchParams.GetEnumerator() -> Ada.Url.AdaSearchParams.Enumerator
+Ada.Url.AdaSearchParams.Has(System.ReadOnlySpan<byte> utf8Key) -> bool
+Ada.Url.AdaSearchParams.Remove(System.ReadOnlySpan<byte> utf8Key) -> void
+Ada.Url.AdaSearchParams.Set(System.ReadOnlySpan<byte> utf8Key, System.ReadOnlySpan<byte> utf8Value) -> void
+Ada.Url.AdaSearchParams.Sort() -> void
+Ada.Url.AdaSearchParams.TryToString(System.Span<byte> destination, out int written) -> bool
 Ada.Url.AdaUrl
 Ada.Url.AdaUrl.AdaUrl() -> void
 Ada.Url.AdaUrl.ClearHash() -> void
@@ -65,12 +87,18 @@ Ada.Url.AdaUrlComponents.SearchStart.get -> uint
 Ada.Url.AdaUrlComponents.UsernameEnd.get -> uint
 const Ada.Url.AdaLibrary.PinnedVersion = "4.0.0" -> string!
 const Ada.Url.AdaUrlComponents.Omitted = 4294967295 -> uint
+override Ada.Url.AdaSearchParams.ToString() -> string!
 override Ada.Url.AdaUrlComponents.Equals(object? obj) -> bool
 override Ada.Url.AdaUrlComponents.GetHashCode() -> int
+static Ada.Url.AdaIdna.ToAscii(string! domain) -> string!
+static Ada.Url.AdaIdna.ToUnicode(string! domain) -> string!
+static Ada.Url.AdaIdna.TryToAscii(System.ReadOnlySpan<byte> utf8Domain, System.Span<byte> destination, out int written) -> bool
+static Ada.Url.AdaIdna.TryToUnicode(System.ReadOnlySpan<byte> utf8Domain, System.Span<byte> destination, out int written) -> bool
 static Ada.Url.AdaLibrary.GetNativeVersionComponents() -> (int Major, int Minor, int Revision)
 static Ada.Url.AdaLibrary.MaxInputLength.get -> uint
 static Ada.Url.AdaLibrary.MaxInputLength.set -> void
 static Ada.Url.AdaLibrary.NativeVersion.get -> string!
+static Ada.Url.AdaSearchParams.Parse(System.ReadOnlySpan<byte> utf8Query) -> Ada.Url.AdaSearchParams
 static Ada.Url.AdaUrl.CanParse(System.ReadOnlySpan<byte> utf8) -> bool
 static Ada.Url.AdaUrl.CanParse(System.ReadOnlySpan<byte> utf8, System.ReadOnlySpan<byte> baseUrl) -> bool
 static Ada.Url.AdaUrl.CanParse(System.ReadOnlySpan<char> input) -> bool

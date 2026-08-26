@@ -19,8 +19,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Public API: `AdaUrl` for multi property work, one shot statics for validation and
   normalisation, `AdaUrlComponents`, and `AdaLibrary`.
 - Tests: ABI conformance, parsing behaviour, and allocation assertions.
+- WHATWG conformance suite over the vendored web-platform-tests corpus, pinned at a known
+  commit: 874 parse cases and 278 setter cases.
+- `AdaSearchParams` with an allocation free struct enumerator, and `AdaIdna` for UTS-46
+  conversion.
 
 ### Notes
 
-- Search params and IDNA are bound at the interop layer but not yet wrapped. They arrive in P3
-  along with the WHATWG conformance corpus.
+- Conformance is verified on Linux x64, Linux arm64, macOS arm64, and Windows x64.

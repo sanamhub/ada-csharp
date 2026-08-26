@@ -71,3 +71,7 @@ dotnet_diagnostic.CA5393.severity = none
 # already disposes with a using statement on the success path, and on the failure path the value
 # is default and owns nothing.
 dotnet_diagnostic.CA2000.severity = none
+
+# A nested struct enumerator is the standard shape for allocation free iteration, the same one
+# List<T>.Enumerator uses. Lifting it out of the type would gain nothing and read worse.
+dotnet_diagnostic.CA1034.severity = none
