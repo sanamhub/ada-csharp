@@ -13,14 +13,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- README performance section reports sustained throughput over ten million URLs alongside the
+- README performance section reports sustained throughput and per platform ratios alongside the
   existing per call figures. The headline said "roughly twice as fast as `System.Uri`", which
-  came from a single URL microbenchmark with a hot cache. Under sustained load it is about 4x on
-  validation and 1.2x on a full parse, with the allocation difference unchanged.
+  came from a single URL microbenchmark with a hot cache on one platform. Validation is 3 to 4x
+  on every platform, a full parse is 1.9x on Linux x64 and level on Windows x64, and allocation
+  is zero everywhere.
+- `docs/benchmarks/0.1.0-beta.1/` holds results for all four platforms. The alpha results are
+  kept and marked superseded.
 
 ### Fixed
 
+- The benchmark collation produced a summary with no comparison in it. Every ratio printed as
+  `n/a` and every benchmark was grouped under a heading called "other", because the script read
+  BenchmarkDotNet's JSON export, which carries neither a `Categories` field nor a baseline
+  marker. It now reads the markdown export, which has both, and fails loudly if no row ends up
+  with a ratio.
 - The nuget.org page had no project website link. `PackageProjectUrl` was never set.
+
+### Known
+
+- The Windows native library is built without whole program optimisation, which costs roughly a
+  factor of two on the parse path. `/GL` breaks `cmake -E __create_def`, which the build depends
+  on because Ada has no `__declspec(dllexport)`. Writing the export list explicitly would allow
+  `/GL` and `/LTCG` to come back. Validation and allocation are unaffected. See ADR-0003.
 
 ## [0.1.0-beta.1] - 2026-08-26
 

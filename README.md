@@ -10,8 +10,9 @@ WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url
 Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers, Telegram,
 Datadog, Kong and Redpanda. This package brings the same parser, and the same results, to .NET.
 
-About 4x faster to validate a URL, 1.2x to parse one, and allocation free on the UTF-8 path
-where `System.Uri` costs around 370 bytes each.
+About 3 to 4x faster to validate a URL, and allocation free on the UTF-8 path where
+`System.Uri` costs around 370 bytes each. A full parse is about 1.9x faster on Linux x64 and
+level on Windows x64, for a reason worth knowing before you adopt it. See performance.
 
 ```csharp
 using var url = AdaUrl.Parse("https://example.org/path/../file.txt"u8);
@@ -147,6 +148,25 @@ x64 desktop, using the published package.
 
 So **3.9x on validation, 1.2x on a full parse**, and no allocation against 374 bytes per URL.
 
+That parse figure is a Windows number, and Windows is the slowest platform for this. Measured on
+CI against `System.Uri` on the same machine:
+
+| Platform | Validate | Parse, span in and span out |
+| --- | ---: | ---: |
+| Linux x64 | **3.7x faster** | **1.9x faster** |
+| Linux arm64 | **4.2x faster** | **1.9x faster** |
+| macOS arm64 | **4.2x faster** | **1.4x faster** |
+| Windows x64 | **3.3x faster** | level |
+
+Windows is slower because the native library is built without whole program optimisation there.
+Ada has no `__declspec(dllexport)`, so the build relies on CMake's `WINDOWS_EXPORT_ALL_SYMBOLS`,
+which runs `cmake -E __create_def` across the compiled objects to generate the export list. With
+`/GL` those objects hold IL rather than COFF symbols and that step crashes, so `/GL` and `/LTCG`
+are off. Linux and macOS build with `-O3 -flto=thin`. This is a real limitation, recorded in
+ADR-0003, and it is fixable by writing the export list explicitly instead of generating it.
+
+Validation and allocation are unaffected. Both are wins on every platform.
+
 Throughput held between 1.8 and 2.0 M/s whether the working set was 6 KiB or 60 MiB, so this is
 not a cache effect. Across 16 threads it reaches 8.7 to 9.4 M/s. Two threads scale at 1.99x, so
 nothing serialises at the interop boundary; beyond that it is memory bandwidth bound.
@@ -194,7 +214,7 @@ is what [`docs/system-uri-differences.md`](docs/system-uri-differences.md) is fo
 
 Results for Linux arm64, Windows x64 and macOS arm64, plus the thousand URL batch workload and
 the UTF-16 transcode cost by input length, are in
-[`docs/benchmarks/`](docs/benchmarks/). Reproduce any of it with
+[`docs/benchmarks/0.1.0-beta.1/`](docs/benchmarks/0.1.0-beta.1/). Reproduce any of it with
 `dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks`.
 
 ## How it works

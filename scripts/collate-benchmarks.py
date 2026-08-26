@@ -21,9 +21,7 @@ hardware, so putting 47 ns next to 61 ns invites a comparison that is not valid.
 
 from __future__ import annotations
 
-import json
 import pathlib
-import re
 import shutil
 import sys
 
@@ -37,75 +35,110 @@ PLATFORM_LABEL = {
     "osx-arm64": "macOS arm64",
 }
 
+# Columns that describe the run rather than a benchmark parameter.
+FIXED_COLUMNS = {
+    "Type", "Method", "Categories", "Job", "Mean", "Error", "StdDev", "StdErr", "Median",
+    "Min", "Max", "Op/s", "Ratio", "RatioSD", "MedianRatio", "Gen0", "Gen1", "Gen2",
+    "Allocated", "Alloc Ratio", "Baseline", "Rank",
+}
+
+
+def parse_markdown(path: pathlib.Path) -> list[dict]:
+    """Read the benchmark rows out of BenchmarkDotNet's markdown export.
+
+    The JSON export is the obvious source and it is the wrong one. It carries no Categories
+    field and no baseline marker, so grouping fell back to a single bucket called "other" and
+    every ratio printed as "n/a". The markdown has both, plus the ratio BenchmarkDotNet already
+    computed against the right baseline, which is better than recomputing it here.
+
+    The rows have no leading pipe, so a parser that splits on a leading "|" sees nothing.
+    """
+    rows: list[dict] = []
+    header: list[str] | None = None
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if "|" not in line:
+            continue
+
+        cells = [c.strip() for c in line.split("|")]
+        if cells and cells[-1] == "":
+            cells.pop()
+
+        # The dashes under the header, and the blank spacer rows between groups.
+        if all(set(c) <= set("-: ") for c in cells if c):
+            continue
+        if not any(cells):
+            continue
+
+        if cells[0] == "Type" or (header is None and "Method" in cells):
+            header = cells
+            continue
+
+        if header is None or len(cells) != len(header):
+            continue
+
+        row = dict(zip(header, cells, strict=False))
+        if not row.get("Method"):
+            continue
+        rows.append(row)
+
+    return rows
+
 
 def load_reports(root: pathlib.Path) -> dict[str, list[dict]]:
-    """Read every BenchmarkDotNet JSON report, keyed by RID."""
+    """Read every platform's markdown report, keyed by RID."""
     reports: dict[str, list[dict]] = {}
 
     for rid in PLATFORMS:
-        entries: list[dict] = []
-        for path in sorted(root.rglob(f"benchmark-{rid}/**/*.json")):
-            if "report" not in path.name.lower():
-                continue
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                continue
-            entries.extend(data.get("Benchmarks", []))
-        if entries:
-            reports[rid] = entries
+        src = next(root.rglob(f"benchmark-{rid}/**/{rid}.md"), None)
+        if src is None:
+            continue
+        rows = parse_markdown(src)
+        if rows:
+            reports[rid] = rows
 
     return reports
 
 
-def method_key(bench: dict) -> str:
+def method_key(row: dict, header_params: list[str]) -> str:
     """A stable name for a benchmark across platforms, parameters included."""
-    name = bench.get("Method", "?")
-    params = bench.get("Parameters", "")
-    return f"{name} [{params}]" if params else name
+    name = row.get("Method", "?")
+    parts = [f"{p}={row[p]}" for p in header_params if row.get(p) not in (None, "", "?")]
+    return f"{name} [{', '.join(parts)}]" if parts else name
 
 
-def ratio_and_bytes(bench: dict, baselines: dict[str, float]) -> tuple[str, str]:
-    stats = bench.get("Statistics") or {}
-    mean = stats.get("Mean")
-    allocated = (bench.get("Memory") or {}).get("BytesAllocatedPerOperation")
+def param_columns(rows: list[dict]) -> list[str]:
+    """Whatever columns are neither fixed nor empty, in the order they appear."""
+    seen: list[str] = []
+    for row in rows:
+        for key in row:
+            if key not in FIXED_COLUMNS and key not in seen and key:
+                seen.append(key)
+    return seen
 
-    group = bench.get("Categories") or []
-    baseline = baselines.get(group[0] if group else "", None)
 
-    if mean is None:
+def ratio_and_bytes(row: dict) -> tuple[str, str]:
+    raw_ratio = (row.get("Ratio") or "").strip()
+    if raw_ratio in ("", "?", "NA"):
         ratio = "n/a"
-    elif baseline:
-        ratio = f"{mean / baseline:.2f}x"
+    elif raw_ratio in ("1.00", "1.0", "1"):
+        # BenchmarkDotNet prints the baseline as exactly 1.00.
+        ratio = "baseline"
     else:
-        ratio = "baseline" if bench.get("IsBaseline") else "n/a"
+        ratio = f"{raw_ratio}x"
 
-    if allocated is None:
+    raw_alloc = (row.get("Allocated") or "").strip()
+    if raw_alloc in ("", "?", "NA"):
         alloc = "n/a"
-    elif allocated == 0:
+    elif raw_alloc == "-":
         alloc = "**0 B**"
-    elif allocated < 1024:
-        alloc = f"{int(allocated)} B"
     else:
-        alloc = f"{allocated / 1024:.1f} KB"
+        alloc = raw_alloc
 
     return ratio, alloc
 
 
-def baselines_for(entries: list[dict]) -> dict[str, float]:
-    """Mean of the baseline benchmark in each category."""
-    out: dict[str, float] = {}
-    for b in entries:
-        if not b.get("IsBaseline"):
-            continue
-        cats = b.get("Categories") or [""]
-        mean = (b.get("Statistics") or {}).get("Mean")
-        if mean:
-            out[cats[0]] = mean
-    return out
-
-
-def write_summary(reports: dict[str, dict], out_dir: pathlib.Path) -> None:
+def write_summary(reports: dict[str, list[dict]], out_dir: pathlib.Path) -> None:
     present = [rid for rid in PLATFORMS if rid in reports]
 
     lines: list[str] = []
@@ -125,15 +158,22 @@ def write_summary(reports: dict[str, dict], out_dir: pathlib.Path) -> None:
         (out_dir / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
         return
 
-    # Group by category so W1, W2 and W3 read as separate questions rather than one long list.
+    params = param_columns([r for rid in present for r in reports[rid]])
+
+    # Group by category so W1, W2, W3 and W4 read as separate questions rather than one list.
     by_category: dict[str, list[str]] = {}
     for rid in present:
-        for bench in reports[rid]["entries"]:
-            cats = bench.get("Categories") or ["other"]
-            by_category.setdefault(cats[0], [])
-            key = method_key(bench)
-            if key not in by_category[cats[0]]:
-                by_category[cats[0]].append(key)
+        for row in reports[rid]:
+            category = row.get("Categories") or row.get("Type") or "other"
+            key = method_key(row, params)
+            bucket = by_category.setdefault(category, [])
+            if key not in bucket:
+                bucket.append(key)
+
+    index = {
+        rid: {method_key(row, params): row for row in reports[rid]}
+        for rid in present
+    }
 
     for category in sorted(by_category):
         lines.append(f"## {category}")
@@ -148,13 +188,11 @@ def write_summary(reports: dict[str, dict], out_dir: pathlib.Path) -> None:
         for key in by_category[category]:
             cells: list[str] = []
             for rid in present:
-                entries = reports[rid]["entries"]
-                baselines = reports[rid]["baselines"]
-                match = next((b for b in entries if method_key(b) == key), None)
-                if match is None:
+                row = index[rid].get(key)
+                if row is None:
                     cells.extend(["n/a", "n/a"])
                 else:
-                    ratio, alloc = ratio_and_bytes(match, baselines)
+                    ratio, alloc = ratio_and_bytes(row)
                     cells.extend([ratio, alloc])
             lines.append(f"| `{key}` | " + " | ".join(cells) + " |")
 
@@ -170,7 +208,7 @@ def write_summary(reports: dict[str, dict], out_dir: pathlib.Path) -> None:
     lines.append("## Reading these")
     lines.append("")
     lines.append("A ratio of `0.50x` means half the time of `System.Uri`, so twice as fast.")
-    lines.append("`baseline` marks the `System.Uri` row each group is measured against.")
+    lines.append("`baseline` marks the row each group is measured against.")
     lines.append("")
     lines.append("Allocation is the column that usually matters more. A parser that allocates")
     lines.append("nothing does not add GC pressure no matter how many URLs go through it.")
@@ -187,8 +225,7 @@ def main() -> int:
     out_dir = pathlib.Path(sys.argv[2])
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    raw = load_reports(root)
-    reports = {rid: {"entries": e, "baselines": baselines_for(e)} for rid, e in raw.items()}
+    reports = load_reports(root)
 
     # Detail pages, copied through as produced.
     for rid in PLATFORMS:
@@ -198,10 +235,30 @@ def main() -> int:
 
     write_summary(reports, out_dir)
 
-    found = ", ".join(sorted(reports)) or "none"
-    print(f"collated platforms: {found}")
-    for rid, data in sorted(reports.items()):
-        print(f"  {rid}: {len(data['entries'])} benchmarks")
+    if not reports:
+        print("no benchmark results were parsed", file=sys.stderr)
+        return 1
+
+    # A summary where nothing has a ratio is the failure this script shipped with for its first
+    # release, and it looks like a successful run. Fail loudly instead.
+    params = param_columns([r for rows in reports.values() for r in rows])
+    rated = sum(
+        1
+        for rows in reports.values()
+        for row in rows
+        if ratio_and_bytes(row)[0] != "n/a"
+    )
+    total = sum(len(rows) for rows in reports.values())
+
+    print(f"collated platforms: {', '.join(sorted(reports))}")
+    for rid, rows in sorted(reports.items()):
+        print(f"  {rid}: {len(rows)} benchmarks")
+    print(f"  rows with a ratio: {rated} of {total}")
+
+    if rated == 0:
+        print("::error::every ratio came out n/a, so the summary carries no comparison", file=sys.stderr)
+        return 1
+
     return 0
 
 

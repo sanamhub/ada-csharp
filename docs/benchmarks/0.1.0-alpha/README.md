@@ -1,5 +1,11 @@
 # Benchmark results, 0.1.0-alpha
 
+> Superseded by [0.1.0-beta.1](../0.1.0-beta.1/), kept as a record of what was measured at the
+> time. Two claims below did not survive a rerun. "Roughly 2x on the simple case" holds on Linux
+> x64 but not on Windows x64, where a parse is level with `System.Uri`. And these were per call
+> microbenchmarks with a hot cache, which flatter the parse path against sustained load.
+
+
 Run on a GitHub hosted `ubuntu-24.04` runner. Commit `eee1cd6`, Ada v4.0.0, `x86-64-v2` baseline
 build.
 
