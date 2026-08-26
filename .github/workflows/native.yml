@@ -49,7 +49,7 @@ jobs:
         include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-13"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
       # TODO: pin these to full commit SHAs before the first release.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: compute cache key
         id: key
