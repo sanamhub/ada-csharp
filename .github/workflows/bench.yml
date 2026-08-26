@@ -1,0 +1,78 @@
+name: bench
+
+# Runs the benchmark harness and uploads the results.
+#
+# Deliberately not a gate. Shared runners are far too noisy for nanosecond thresholds, and a
+# flaky performance gate gets disabled within a month, taking real coverage with it. Allocation
+# is what gets gated, and that happens in the test suite where it is deterministic.
+#
+# Treat the ratios here as meaningful and the absolute nanosecond figures as indicative. For
+# numbers worth publishing, run this on a pinned machine.
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: 'BenchmarkDotNet filter, for example *W1* or *Complex*'
+        type: string
+        default: '*'
+  schedule:
+    - cron: '0 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  natives:
+    uses: ./.github/workflows/native.yml
+
+  run:
+    needs: natives
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-linux-x64
+          path: artifacts/native/linux-x64
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # If the native cannot load, every benchmark reports the same suspiciously fast number,
+      # because each one returns 0 immediately. Fail here instead, where the reason is obvious.
+      - name: check the native loads
+        run: dotnet test -c Release --filter "Category=Abi"
+
+      - name: run benchmarks
+        run: >
+          dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks --
+          --filter "${{ inputs.filter || '*' }}"
+          --exporters json markdown
+          --memory
+
+      - name: show the summary in the job log
+        if: always()
+        run: |
+          for f in BenchmarkDotNet.Artifacts/results/*.md; do
+            [ -f "$f" ] || continue
+            echo "### $(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
+            cat "$f" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: BenchmarkDotNet.Artifacts/results
+          retention-days: 30
