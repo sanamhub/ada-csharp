@@ -41,7 +41,11 @@ if [ ! -d "$SRC/.git" ]; then
 fi
 
 CXX_FLAGS="-O3 -DNDEBUG $ARCH_FLAGS -flto=thin -fno-plt -fno-semantic-interposition"
-CXX_FLAGS="$CXX_FLAGS -fvisibility=hidden -ffunction-sections -fdata-sections"
+# No -fvisibility=hidden. Ada does not annotate its C API for visibility, so hiding by default
+# hides every ada_* symbol, and LTO plus --gc-sections then strips the library down to nothing.
+# The first attempt produced a 14 KB libada.so that exported not one symbol. Do not add it back
+# without also patching upstream, which is not our call to make.
+CXX_FLAGS="$CXX_FLAGS -ffunction-sections -fdata-sections"
 CXX_FLAGS="$CXX_FLAGS -fstack-protector-strong -fcf-protection=full"
 LINK_FLAGS="-flto=thin -Wl,--gc-sections -Wl,-O2 -Wl,--as-needed"
 LINK_FLAGS="$LINK_FLAGS -Wl,-z,relro,-z,now -Wl,-z,noexecstack"
@@ -83,7 +87,11 @@ cmake --build "$BUILD" --parallel
 # real file under the plain name. The managed side asks the loader for "ada", which the platform
 # turns into libada.so.
 mkdir -p "$OUT"
+# head closes the pipe early, which kills find with SIGPIPE and trips pipefail. Turn it off
+# for exactly this line rather than losing the protection everywhere else.
+set +o pipefail
 BUILT="$(find "$BUILD" -name 'libada.so*' -not -name '*.unstripped' | head -1)"
+set -o pipefail
 if [ -z "$BUILT" ]; then
   echo "build produced no libada.so. What it did produce:" >&2
   find "$BUILD" -name '*.so*' >&2

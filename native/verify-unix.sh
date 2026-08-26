@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Export and hardening gates for a Linux or macOS artifact.
 #
-# The export gate exists because -fvisibility=hidden on ELF and Mach-O exports only annotated
-# symbols. If upstream does not annotate its C API, we ship a library that builds and links and
-# exports nothing. That is the silent failure of the native build, so it fails here instead.
+# The export gate exists because a library can build, link, and export nothing at all. That
+# already happened here: -fvisibility=hidden plus LTO and --gc-sections produced a 14 KB
+# libada.so with no ada_* symbols in it, because Ada does not annotate its C API for visibility.
+# Without this check that artifact would have shipped and failed at the first P/Invoke.
 set -euo pipefail
 
 DIR="${1:-}"
@@ -35,7 +36,8 @@ done
 
 if [ -n "$MISSING" ]; then
   echo "FAIL: missing exported symbols:$MISSING" >&2
-  echo "If every ada_* symbol is missing, drop -fvisibility=hidden. Do not patch upstream." >&2
+  echo "If every ada_* symbol is missing, look for -fvisibility=hidden in the build flags." >&2
+  echo "Ada does not annotate its C API, so hiding by default hides all of it." >&2
   exit 1
 fi
 

@@ -31,10 +31,20 @@ if (-not (Test-Path (Join-Path $src '.git'))) {
     if ($LASTEXITCODE -ne 0) { throw "git clone failed with exit code $LASTEXITCODE" }
 }
 
-# /GL without /LTCG silently degrades, so the pair is not optional.
+# No /GL and no /LTCG.
+#
+# Ada has no __declspec(dllexport), so the DLL depends on upstream's WINDOWS_EXPORT_ALL_SYMBOLS,
+# which makes CMake run `cmake -E __create_def` to build an exports file by reading the compiled
+# objects. With /GL those objects hold IL rather than COFF symbols, and __create_def dies with
+# 0xC0000005 reading them. It crashed on simdutf first, then on ada.vcxproj once simdutf was
+# turned off, so it is /GL and not the dependency.
+#
+# The choice is whole program optimisation with no exports, or a working DLL. /OPT:REF and
+# /OPT:ICF still run at link time, so this is not the whole of LTO gone.
+#
 # /guard:cf, /DYNAMICBASE, /HIGHENTROPYVA and /CETCOMPAT are required hardening.
-$cxxFlags  = '/O2 /Ob3 /Oi /GL /Gy /Gw /EHsc /DNDEBUG /Zi /guard:cf'
-$linkFlags = '/LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /GUARD:CF /DYNAMICBASE /HIGHENTROPYVA /CETCOMPAT'
+$cxxFlags  = '/O2 /Ob3 /Oi /Gy /Gw /EHsc /DNDEBUG /Zi /guard:cf'
+$linkFlags = '/OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /GUARD:CF /DYNAMICBASE /HIGHENTROPYVA /CETCOMPAT'
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 
@@ -43,7 +53,7 @@ cmake -S $src -B $build -G 'Visual Studio 17 2022' -A x64 `
     -DBUILD_SHARED_LIBS=ON `
     -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF `
     -DADA_USE_SIMDUTF=OFF `
-    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON `
+    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF `
     -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON `
     -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
     "-DCMAKE_CXX_FLAGS_RELEASE=$cxxFlags" `

@@ -327,15 +327,19 @@ Flag notes:
 - `-mcpu=apple-m1` is safe only because `osx-arm64` implies Apple Silicon. Do not copy it into
   the `linux-arm64` build, where the hardware is unknown.
 
-`-fvisibility=hidden` has a trap. On ELF and Mach-O it exports only annotated symbols. If upstream
-does not annotate its C API, we ship a library that builds and exports nothing. Hard CI gate:
+`-fvisibility=hidden` is not used, and the reason is worth keeping. On ELF and Mach-O it exports
+only annotated symbols, and Ada does not annotate its C API. The first CI run with it produced a
+14 KB `libada.so` that exported nothing, because LTO and `--gc-sections` had no roots to keep.
+The gate below caught it. Windows drops `/GL` and `/LTCG` for a related reason, see ADR-0003.
+
+The gate stays, because this class of failure is silent without it:
 
 ```bash
 test "$(nm -gDU build/linux-x64/libada.so | grep -c ' T ada_')" -gt 0
 ```
 
-If it fails, drop the flag. Do not patch upstream. This is AC-2.2 and it is the silent failure
-mode of this section.
+A library that builds, links, and exports nothing is the silent failure mode of this section.
+This is AC-2.2.
 
 ### 2.5 NuGet layout
 

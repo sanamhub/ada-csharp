@@ -46,7 +46,7 @@ cmake -S "$SRC" -B "$BUILD" -G Ninja \
   -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON \
   -DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN" \
-  -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -flto=thin -fvisibility=hidden -fstack-protector-strong $ARCH_FLAGS" \
+  -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -flto=thin -fstack-protector-strong $ARCH_FLAGS" \
   -DCMAKE_SHARED_LINKER_FLAGS_RELEASE="-flto=thin -Wl,-dead_strip"
 
 cmake --build "$BUILD" --parallel
@@ -54,7 +54,10 @@ cmake --build "$BUILD" --parallel
 # CMake writes the target under src/, and names it libada.dylib or libada.4.dylib depending on
 # how it handles SOVERSION.
 mkdir -p "$OUT"
+# head closes the pipe early, which kills find with SIGPIPE and trips pipefail.
+set +o pipefail
 BUILT="$(find "$BUILD" -name 'libada*.dylib' | head -1)"
+set -o pipefail
 if [ -z "$BUILT" ]; then
   echo "build produced no dylib. What it did produce:" >&2
   find "$BUILD" -name '*.dylib' >&2

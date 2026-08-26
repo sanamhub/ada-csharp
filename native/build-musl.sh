@@ -26,6 +26,6 @@ ALPINE="alpine:3.20@sha256:216266c86fc4dcef5619930bd394245824c2af52fd21ba7c6fa0e
 docker run --rm -v "$ROOT:/w" -w /w "$ALPINE" sh -c "
   set -eu
   # bash is not in the Alpine base image and build-linux.sh needs it.
-  apk add --no-cache bash build-base clang lld binutils cmake ninja git
+  apk add --no-cache bash build-base clang lld binutils cmake ninja git python3
   ./native/build-linux.sh --ada-tag '$ADA_TAG' --rid '$RID'
 "

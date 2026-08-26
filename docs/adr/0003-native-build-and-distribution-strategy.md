@@ -54,9 +54,42 @@ only accelerates transcoding.
 Worth revisiting if upstream gains an option to link simdutf statically, or if measurement shows
 the transcoding path actually matters for our workload.
 
+## Why symbol visibility stays at the default
+
+`-fvisibility=hidden` looked like free hygiene. It is not, here.
+
+Ada does not annotate its C API with visibility attributes, so hiding by default hides every
+`ada_*` symbol. Combined with LTO and `--gc-sections`, the linker then has no roots to keep, and
+CI produced a 14 KB `libada.so` that exported nothing at all. It built, it linked, and it would
+have failed at the consumer's first P/Invoke.
+
+The export gate caught it, which is the whole reason that gate exists. The flag is gone. Do not
+add it back without patching upstream, which is not our call.
+
+## Why Windows has no whole program optimisation
+
+Ada has no `__declspec(dllexport)`, so the Windows DLL relies on upstream's
+`WINDOWS_EXPORT_ALL_SYMBOLS`. That makes CMake run `cmake -E __create_def`, which reads the
+compiled objects and writes an exports file.
+
+With `/GL`, those objects hold IL rather than COFF symbols, and `__create_def` dies with
+`0xC0000005` reading them. It crashed on simdutf first and then on `ada.vcxproj` once simdutf was
+off, which is what identifies `/GL` rather than the dependency as the cause.
+
+So the Windows build drops `/GL`, `/LTCG`, and `CMAKE_INTERPROCEDURAL_OPTIMIZATION`. The choice
+was whole program optimisation with no exports, or a DLL that works. `/OPT:REF` and `/OPT:ICF`
+still run, so link time optimisation is reduced rather than absent. Linux and macOS keep
+`-flto=thin`, so this costs one platform, not all three.
+
+Worth revisiting if upstream adds export annotations, which would remove the dependency on
+`__create_def` entirely.
+
 ## Consequences
 
 The baseline build runs on any x86-64-v2 CPU, which means 2009 hardware onward.
+
+Windows binaries are optimised slightly less than Linux and macOS ones. Quantify it in the
+benchmark run before deciding whether it matters.
 
 Six RIDs cost six CI matrix legs and six ABI conformance lanes.
 
