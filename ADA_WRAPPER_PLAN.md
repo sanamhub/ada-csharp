@@ -978,7 +978,7 @@ flaky perf gate gets disabled within a month, taking real coverage with it.
 | AC-5.3 | `Mean` in ns with `Error`, `StdDev`, `Median`, and `P95` |
 | AC-5.4 | The JIT versus NativeAOT job confirms T1 stays at 0 B under AOT |
 | AC-5.5 | W4 yields the measured `stackalloc` threshold, and the code constant matches it |
-| AC-5.6 | W1's ten getters versus slicing variant decides section 3.7 with data |
+| AC-5.6 | Closed. Reading all ten components costs 100.7 ns against 92.4 ns for three, so eight extra suppressed transition calls cost under a nanosecond each. The slicing layer is not worth its sentinel handling risk. See docs/benchmarks. |
 | AC-5.7 | Disassembly artifact archived, showing no marshalling stub on T1 |
 | AC-5.8 | Nightly perf tracking with a stored baseline and a 15% alert |
 

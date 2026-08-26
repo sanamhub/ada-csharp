@@ -29,6 +29,26 @@ Lifetime comes in three sizes. Handle free statics for the common validate and n
 A stack bound `ref struct` for work that touches several properties. A `SafeHandle` for when a
 URL has to live in a field.
 
+## Numbers
+
+Measured on a GitHub hosted `ubuntu-24.04` runner. Ratios are trustworthy, absolute nanoseconds
+are indicative. Full results and caveats in [`docs/benchmarks/`](docs/benchmarks/0.1.0-alpha/).
+
+`https://example.com/path`:
+
+| | Mean | vs `System.Uri` | Allocated |
+| --- | ---: | ---: | ---: |
+| `CanParse` | 47 ns | 0.26x | **0 B** |
+| Parse, span in and span out | 92 ns | 0.50x | **0 B** |
+| Parse, string in and string out | 122 ns | 0.66x | 72 B |
+| `System.Uri` | 185 ns | 1.00x | 288 B |
+
+A complex URL with credentials, an internationalised host, dot segments and a heavy query costs
+1,139 ns and 0 B, against 1,684 ns and 2,160 B for `System.Uri`.
+
+Conformance: **874 WHATWG parse cases and 278 setter cases pass** on Linux x64, Linux arm64,
+macOS arm64, and Windows x64.
+
 ## Limits
 
 **Zero allocation means span in, span out.** Any `System.String` result allocates by
