@@ -46,6 +46,35 @@ bad version.
 2. Confirm the GitHub release carries the nupkg, snupkg and SBOM.
 3. Open the next `Unreleased` section in `CHANGELOG.md`.
 
+## One time setup on nuget.org
+
+Publishing uses trusted publishing, so there is no long lived API key anywhere. nuget.org
+validates a short lived GitHub OIDC token against a policy and hands back a temporary key that
+lives for one hour.
+
+Register the policy once, at nuget.org under your username, Trusted Publishing:
+
+| Field | Value |
+| --- | --- |
+| Repository Owner | `sanamhub` |
+| Repository | `ada-csharp` |
+| Workflow File | `release.yml` (file name only, no path) |
+| Environment | `production` |
+
+Then add one repository secret, `NUGET_USER`, holding the nuget.org **profile name**, not the
+email address. That is all the workflow needs.
+
+Two things to know about the policy. It applies to every package owned by the chosen owner, so
+pick between your user and an organisation deliberately. And on a private repository a new policy
+is only temporarily active for seven days until the first successful publish records the
+repository and owner IDs, which is what stops someone deleting a repository, recreating it under
+the same name, and publishing as if nothing changed. This repository is public, so that does not
+apply here.
+
+If trusted publishing is not yet visible on the account, it is being rolled out gradually. The
+fallback is a scoped API key in a `NUGET_API_KEY` secret, which then has to be rotated and is
+worth replacing with trusted publishing when it appears.
+
 ## What is not automated yet
 
 Code signing is gated behind the `CODE_SIGNING_ENABLED` repository variable and needs a

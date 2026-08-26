@@ -145,9 +145,32 @@ jobs:
         run: scripts/sign.ps1 -Dir out
         shell: pwsh
 
+      # Trusted publishing. nuget.org validates a short lived GitHub OIDC token against a
+      # policy registered for this repository and workflow, and returns a temporary API key.
+      # No long lived secret exists to leak or rotate.
+      #
+      # The key lives for one hour and each token buys exactly one key, so this step sits
+      # immediately before the push rather than at the top of the job.
+      #
+      # Requires a policy at nuget.org under Account, Trusted Publishing:
+      #   Repository Owner: sanamhub
+      #   Repository:       ada-csharp
+      #   Workflow File:    release.yml
+      #   Environment:      production
+      - name: exchange the OIDC token for a temporary api key
+        id: nuget-login
+        if: github.event_name == 'push' || inputs.dry-run == false
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: publish to nuget.org
         if: github.event_name == 'push' || inputs.dry-run == false
-        run: dotnet nuget push "out/*.nupkg" --source https://api.nuget.org/v3/index.json
+        run: >
+          dotnet nuget push "out/*.nupkg"
+          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
 
       - uses: softprops/action-gh-release@v2
         if: github.event_name == 'push'
