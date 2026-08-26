@@ -24,8 +24,35 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
 jobs:
+  preflight:
+    # Seconds, and it runs first. Everything it checks used to be discovered either after twenty
+    # minutes of native builds or, worse, in the publish job after a human had already approved
+    # the deployment. A release that fails should fail before it costs anyone anything.
+    name: preflight
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: the tag, the project version and the changelog must agree
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+
+          project="$(grep -oPm1 '(?<=<Version>)[^<]+' src/Ada.Url/Ada.Url.csproj)"
+          if [ "$tag" != "$project" ]; then
+            echo "::error::tag says $tag, Ada.Url.csproj says $project. Pushing this tag would publish the wrong version."
+            exit 1
+          fi
+          echo "tag and project version agree: $tag"
+
+          ./scripts/changelog-section.sh "$tag" > /dev/null
+          echo "CHANGELOG.md has a section for $tag"
+
   natives:
     # All six. A release is the one place that cannot skip a RID to save runner time.
+    needs: preflight
     uses: ./.github/workflows/native.yml
     secrets: inherit
 
@@ -227,11 +254,46 @@ jobs:
           echo "::error::Ada.Url $version never became usable from nuget.org"
           exit 1
 
+      # Notes come from CHANGELOG.md, not from the commit log. generate_release_notes would list
+      # every commit since the previous tag, which on a first release means the entire history:
+      # thirty lines of "fix:" that describe how the work happened rather than what shipped.
+      - name: build the release notes
+        id: notes
+        # Tag pushes only. On a workflow_dispatch the ref name is a branch, and looking up a
+        # changelog section for "main" would fail the job after everything else succeeded.
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          {
+            ./scripts/changelog-section.sh "$version"
+            echo
+            echo "### Install"
+            echo
+            echo '```'
+            echo "dotnet add package Ada.Url --version $version"
+            echo '```'
+            echo
+            echo "### Verification"
+            echo
+            echo "- Attached: the package, its symbols, and a CycloneDX SBOM listing the native library."
+            echo "- The six native binaries are built from the pinned Ada tag in CI and their SHA-256"
+            echo "  checksums are matched against \`native/CHECKSUMS.txt\` before the package is pushed."
+            echo "- Published with NuGet trusted publishing, so no long lived API key exists for this repository."
+            echo
+            echo "[Full changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md)"
+          } > release-notes.md
+          echo "--- release notes ---"
+          cat release-notes.md
+
       - uses: softprops/action-gh-release@v2
         if: github.event_name == 'push'
         with:
+          body_path: release-notes.md
+          # Beta and rc tags land as prereleases rather than as the headline version.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             out/*.nupkg
             out/*.snupkg
             sbom/*
-          generate_release_notes: true

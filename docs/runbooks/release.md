@@ -2,12 +2,17 @@
 
 ## Before tagging
 
-1. `CHANGELOG.md` has an entry for the version, moved out of Unreleased.
-2. `native/CHECKSUMS.txt` matches the natives the release will build. It is produced by the
+1. `CHANGELOG.md` has an entry for the version, moved out of Unreleased. The GitHub release
+   notes are built from that section, so it is the text people will actually read.
+2. `src/Ada.Url/Ada.Url.csproj` has the matching `<Version>`.
+3. `native/CHECKSUMS.txt` matches the natives the release will build. It is produced by the
    `manifest` job in `native.yml`. If upstream Ada moved, this file has to be regenerated and
    committed, or the release fails its verification step, which is the intended behaviour.
-3. `PublicAPI.Unshipped.txt` entries are moved to `PublicAPI.Shipped.txt` for a stable release.
-4. CI is green on `main`.
+4. `PublicAPI.Unshipped.txt` entries are moved to `PublicAPI.Shipped.txt` for a stable release.
+5. CI is green on `main`.
+
+The first three are checked by the `preflight` job before anything is built, so getting one
+wrong costs seconds rather than a whole release.
 
 ## Releasing
 
@@ -16,13 +21,24 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-That triggers `release.yml`, which builds all six natives from the pinned upstream tag, packs
-with the completeness gate active, and consumes the package from a clean project on every
-platform including Alpine. The `publish` job then waits on the `production` environment
-approval.
+That triggers `release.yml`:
+
+| Job | What it does |
+| --- | --- |
+| `preflight` | Checks the tag, the project version and the changelog agree. Seconds. |
+| `natives` | Builds all six native libraries from the pinned upstream Ada tag. |
+| `verify` | Packs with the completeness gate active and consumes the package from a clean project on five platforms, Alpine included. |
+| `publish` | Waits on the `production` environment approval, then verifies checksums, packs, builds the SBOM, pushes to nuget.org, reinstalls from nuget.org, and creates the GitHub release. |
+
+Approve the deployment at the run's page, under `publish`, `Review deployments`.
+
+Everything after the approval is automatic. **The GitHub release is created by the workflow**,
+with notes taken from the `CHANGELOG.md` section for the tag, an install snippet, and the
+`.nupkg`, `.snupkg` and SBOM attached. A tag containing a `-`, so any beta or rc, is marked as a
+prerelease. Do not create one by hand at `/releases/new`; that only produces a duplicate.
 
 Use the `workflow_dispatch` trigger with `dry-run: true` to exercise everything except the push
-to nuget.org.
+to nuget.org and the release creation.
 
 ## Rolling back
 
@@ -40,11 +56,16 @@ bad version.
 
 ## After releasing
 
-1. Install the published package from nuget.org in a clean project on Windows, Linux and macOS
-   and run the smoke test. The `verify` job tests the local artifact, which is not the same as
-   testing what nuget.org actually served.
-2. Confirm the GitHub release carries the nupkg, snupkg and SBOM.
-3. Open the next `Unreleased` section in `CHANGELOG.md`.
+The workflow already reinstalls the package from nuget.org and creates the release, so what is
+left is short.
+
+1. Read the release page. Confirm the notes match the changelog and that the nupkg, snupkg and
+   SBOM are attached.
+2. Run `tests/packaging/verify-published.sh --version <version>` on a second operating system.
+   The workflow runs it on Windows only, and this is the one test that uses what nuget.org
+   actually served rather than a local artifact.
+3. Open the next `Unreleased` section in `CHANGELOG.md` and bump `<Version>` for the next cycle.
+   This is the one manual changelog step; nothing writes it for you.
 
 ## One time setup on nuget.org
 
