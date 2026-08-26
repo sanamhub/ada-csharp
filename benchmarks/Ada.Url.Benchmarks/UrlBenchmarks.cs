@@ -1,6 +1,7 @@
 using System.Text;
 using Ada.Url;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Order;
 
 namespace Ada.Url.Benchmarks;
@@ -29,6 +30,10 @@ namespace Ada.Url.Benchmarks;
 /// </remarks>
 [MemoryDiagnoser(displayGenColumns: true)]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
+// Without this, every benchmark in the class is one group and only one method in the whole
+// class may carry Baseline = true. W1 and W2 each need their own System.Uri baseline, so the
+// groups have to follow the categories.
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [CategoriesColumn]
 [MedianColumn]
 public class UrlBenchmarks

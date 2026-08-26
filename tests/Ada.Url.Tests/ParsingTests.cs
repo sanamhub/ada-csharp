@@ -46,10 +46,13 @@ public class ParsingTests
     [Fact]
     public void Parse_ResolvesAgainstABase()
     {
+        // Base path is /one/two/three. Resolving a relative reference drops the last segment,
+        // leaving /one/two/, then ".." pops "two", then "b" is appended. So /one/b, not /b.
+        // The first version of this test asserted /b and Ada was right.
         Assert.True(AdaUrl.TryParse("../b"u8, "https://example.org/one/two/three"u8, out AdaUrl url));
         using (url)
         {
-            Assert.Equal("https://example.org/b", Encoding.UTF8.GetString(url.Href));
+            Assert.Equal("https://example.org/one/b", Encoding.UTF8.GetString(url.Href));
         }
     }
 

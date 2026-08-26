@@ -65,6 +65,18 @@ jobs:
           --exporters json markdown
           --memory
 
+      # BenchmarkDotNet exits 0 when its own validation rejects the run, so a broken harness
+      # otherwise produces a green job that measured nothing. That already happened once.
+      - name: fail if nothing was measured
+        run: |
+          shopt -s nullglob
+          results=(BenchmarkDotNet.Artifacts/results/*.md)
+          if [ ${#results[@]} -eq 0 ]; then
+            echo "::error::BenchmarkDotNet produced no results. Check the validation output above."
+            exit 1
+          fi
+          echo "produced ${#results[@]} result file(s)"
+
       - name: show the summary in the job log
         if: always()
         run: |

@@ -154,8 +154,11 @@ public static class WhatwgCorpus
 
         foreach (JsonProperty setter in doc.RootElement.EnumerateObject())
         {
-            // The top level "comment" key is documentation, not a setter.
-            if (setter.Value.ValueKind != JsonValueKind.Array)
+            // "comment" is upstream's documentation for the file. It is an ARRAY of strings, not
+            // an object, so a "skip anything that is not an array" guard lets it straight
+            // through and the loader then tries to read href off a string.
+            if (setter.Value.ValueKind != JsonValueKind.Array
+                || string.Equals(setter.Name, "comment", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -164,6 +167,13 @@ public static class WhatwgCorpus
             foreach (JsonElement element in setter.Value.EnumerateArray())
             {
                 index++;
+
+                // Belt and braces: any future section comment inside a setter array is skipped
+                // rather than throwing halfway through loading.
+                if (element.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
 
                 var expected = new Dictionary<string, string>(StringComparer.Ordinal);
                 if (element.TryGetProperty("expected", out JsonElement expectedElement))
