@@ -49,7 +49,7 @@ jobs:
         include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-13"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
       # TODO: pin these to full commit SHAs before the first release.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: compute cache key
         id: key
@@ -107,7 +107,7 @@ jobs:
         shell: bash
         run: ./native/checksum.sh artifacts/native/${{ matrix.rid }} | tee checksums-${{ matrix.rid }}.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: native-${{ matrix.rid }}
           path: |
@@ -115,7 +115,7 @@ jobs:
             !artifacts/native/${{ matrix.rid }}/*.unstripped
           retention-days: 7
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: checksums-${{ matrix.rid }}
           path: checksums-${{ matrix.rid }}.txt
@@ -127,14 +127,14 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: checksums-*
           path: sums
           merge-multiple: true
       - name: combine
         run: cat sums/*.txt | sort -k2 | tee CHECKSUMS.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: checksums
           path: CHECKSUMS.txt

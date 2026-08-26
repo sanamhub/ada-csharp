@@ -47,13 +47,13 @@ jobs:
           - { os: macos-14,         rid: osx-arm64   }
     steps:
       # TODO(P1): pin third-party actions by full commit SHA (org section 7 supply chain).
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: download native
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: native-${{ matrix.rid }}
           path: artifacts/native/${{ matrix.rid }}
@@ -85,7 +85,7 @@ jobs:
 
       - name: upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.rid }}
           path: TestResults
@@ -101,15 +101,15 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: csharp
       - run: dotnet build -c Release
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
 
   deps:
     name: dependency review
@@ -119,7 +119,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Blocks a merge on a critical or high advisory without a recorded risk decision.
       #
       # continue-on-error until the action is confirmed working on this repo. It failed on all
@@ -127,7 +127,7 @@ jobs:
       # action erroring rather than reporting a finding. It needs the repository Dependency
       # graph enabled to call the dependency-graph compare API. Once a run produces a real
       # report, drop continue-on-error and add this job back to branch protection.
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@v5
         continue-on-error: true
         with:
           fail-on-severity: high
