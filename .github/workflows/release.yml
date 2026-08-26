@@ -1,0 +1,159 @@
+name: release
+
+# Builds all six native libraries, packs, verifies the package by consuming it, and publishes.
+#
+# Nothing here trusts a previous run. The natives are rebuilt from the pinned upstream tag, the
+# checksums are verified against the committed manifest, and the package is consumed from a
+# clean project before it is pushed anywhere.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Build, verify and attach artifacts without publishing to NuGet'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  natives:
+    # All six. A release is the one place that cannot skip a RID to save runner time.
+    uses: ./.github/workflows/native.yml
+    secrets: inherit
+
+  verify:
+    name: verify (${{ matrix.name }})
+    needs: natives
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64,      os: ubuntu-24.04,     rid: linux-x64,      container: '' }
+          - { name: linux-arm64,    os: ubuntu-24.04-arm, rid: linux-arm64,    container: '' }
+          - { name: win-x64,        os: windows-2022,     rid: win-x64,        container: '' }
+          - { name: osx-arm64,      os: macos-14,         rid: osx-arm64,      container: '' }
+          - { name: osx-x64,        os: macos-13,         rid: osx-x64,        container: '' }
+          # A glibc .so will not load on Alpine, so this leg is what proves the musl RID is real
+          # rather than assumed. AC-2.5.
+          - { name: linux-musl-x64, os: ubuntu-24.04,     rid: linux-musl-x64, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: alpine prerequisites
+        if: matrix.container != ''
+        run: apk add --no-cache bash python3
+        shell: sh
+
+      - uses: actions/setup-dotnet@v6
+        if: matrix.container == ''
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: native-*
+          path: artifacts/native
+      - name: flatten the artifact layout
+        shell: bash
+        run: |
+          cd artifacts/native
+          for d in native-*; do
+            [ -d "$d" ] || continue
+            mv "$d" "${d#native-}"
+          done
+          ls -R . | head -40
+
+      # The gate is active here: a release package missing any RID fails to pack.
+      - name: pack
+        shell: bash
+        run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out
+
+      - name: consume the package
+        shell: bash
+        run: ./tests/packaging/verify-package.sh --package-dir out --rid ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.rid == 'linux-x64'
+        with:
+          name: nupkg
+          path: |
+            out/*.nupkg
+            out/*.snupkg
+          retention-days: 30
+
+  publish:
+    needs: verify
+    runs-on: windows-2022          # code signing
+    environment: production        # manual approval gate
+    permissions:
+      contents: write              # create the GitHub release
+      id-token: write              # NuGet trusted publishing, so there is no long lived key
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: native-*
+          path: artifacts/native
+      - uses: actions/download-artifact@v7
+        with:
+          name: checksums
+          path: manifest
+
+      - name: verify checksums against the committed manifest
+        shell: bash
+        run: |
+          cd artifacts/native
+          for d in native-*; do [ -d "$d" ] && mv "$d" "${d#native-}"; done
+          cd ..
+          if [ ! -f ../native/CHECKSUMS.txt ]; then
+            echo "::error::native/CHECKSUMS.txt is missing. A release cannot verify what it ships."
+            exit 1
+          fi
+          # Tampering with a native binary breaks the build here rather than shipping.
+          diff <(sort ../native/CHECKSUMS.txt) <(sort manifest/CHECKSUMS.txt) \
+            || { echo "::error::native checksums do not match the committed manifest"; exit 1; }
+          echo "checksums match"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: pack
+        run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out
+
+      - name: sbom
+        run: |
+          dotnet tool install -g CycloneDX
+          dotnet CycloneDX src/Ada.Url/Ada.Url.csproj -o sbom
+        shell: pwsh
+
+      # TODO: signing needs a certificate in the production environment. Until one exists this
+      # step is skipped rather than faked, because an unsigned package that claims to be signed
+      # is worse than one that does not claim it.
+      - name: sign
+        if: vars.CODE_SIGNING_ENABLED == 'true'
+        run: scripts/sign.ps1 -Dir out
+        shell: pwsh
+
+      - name: publish to nuget.org
+        if: github.event_name == 'push' || inputs.dry-run == false
+        run: dotnet nuget push "out/*.nupkg" --source https://api.nuget.org/v3/index.json
+
+      - uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          files: |
+            out/*.nupkg
+            out/*.snupkg
+            sbom/*
+          generate_release_notes: true

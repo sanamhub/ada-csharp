@@ -91,8 +91,51 @@ jobs:
           path: TestResults
           retention-days: 7
 
-  # TODO(P2): add a `Category=Abi` leg here. It is the per-RID ship gate (plan section 4.5).
-  # TODO(P4): add `packaging` (Alpine + NativeAOT consumption) once natives exist.
+  packaging:
+    # Consumes the built package from a clean project with no reference to this source tree.
+    #
+    # This is the job that catches a package which builds, tests, and installs cleanly and then
+    # throws DllNotFoundException on the consumer's first call. That exact bug shipped once.
+    needs: natives
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: native-*
+          path: artifacts/native
+      - name: flatten the artifact layout
+        run: |
+          cd artifacts/native
+          for d in native-*; do
+            [ -d "$d" ] || continue
+            mv "$d" "${d#native-}"
+          done
+          ls -R .
+
+      # AllowPartialNativePack is set here on purpose. A pull request builds four RIDs, so the
+      # package is deliberately incomplete and this job is testing consumption rather than
+      # release readiness. The release workflow packs all six with the gate active.
+      - name: pack
+        run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out -p:AllowPartialNativePack=true
+
+      - name: consume the package
+        run: ./tests/packaging/verify-package.sh --package-dir out --rid linux-x64
+
+      - name: consume it under NativeAOT
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+          ./tests/packaging/verify-package.sh --package-dir out --rid linux-x64 --aot
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nupkg
+          path: out/*.nupkg
+          retention-days: 7
 
   analyze:
     name: codeql
