@@ -54,10 +54,11 @@ cmake --build "$BUILD" --parallel
 # CMake writes the target under src/, and names it libada.dylib or libada.4.dylib depending on
 # how it handles SOVERSION.
 mkdir -p "$OUT"
-# head closes the pipe early, which kills find with SIGPIPE and trips pipefail.
-set +o pipefail
-BUILT="$(find "$BUILD" -name 'libada*.dylib' | head -1)"
-set -o pipefail
+# No pipe at all. head would close it early, kill find with SIGPIPE, and pipefail would report
+# the whole pipeline as failed.
+ALL_BUILT="$(find "$BUILD" -name 'libada*.dylib')"
+BUILT="${ALL_BUILT%%$'
+'*}"
 if [ -z "$BUILT" ]; then
   echo "build produced no dylib. What it did produce:" >&2
   find "$BUILD" -name '*.dylib' >&2

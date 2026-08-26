@@ -26,10 +26,14 @@ case "$LIB" in
   *.dylib) SYMBOLS="$(nm -gU "$LIB")" ;;
 esac
 
+# Here strings, not pipes. grep -q exits at the first match, which closes the pipe, which kills
+# printf with SIGPIPE, which pipefail turns into a failed pipeline. That made this report a
+# symbol that was present as missing, intermittently, depending on where in the output the match
+# happened to land. It passed for days and then failed on osx-arm64.
 MISSING=""
 for sym in $REQUIRED; do
   # Mach-O prefixes C symbols with an underscore.
-  if ! printf '%s\n' "$SYMBOLS" | grep -qE "(^| )_?${sym}$"; then
+  if ! grep -qE "(^| )_?${sym}$" <<< "$SYMBOLS"; then
     MISSING="$MISSING $sym"
   fi
 done
@@ -41,7 +45,7 @@ if [ -n "$MISSING" ]; then
   exit 1
 fi
 
-TOTAL="$(printf '%s\n' "$SYMBOLS" | grep -cE '(^| )_?ada_' || true)"
+TOTAL="$(grep -cE '(^| )_?ada_' <<< "$SYMBOLS" || true)"
 echo "PASS: exports present, $TOTAL ada_* symbols total"
 
 # Hardening. readelf is present on the Ubuntu runners, so no checksec dependency.
@@ -50,12 +54,13 @@ if [ "${LIB##*.}" = "so" ]; then
   DYNAMIC="$(readelf -dW "$LIB")"
   fail=0
 
-  printf '%s\n' "$HEADERS" | grep -q 'GNU_RELRO' \
+  grep -q 'GNU_RELRO' <<< "$HEADERS" \
     || { echo "FAIL: no GNU_RELRO segment" >&2; fail=1; }
-  printf '%s\n' "$DYNAMIC" | grep -qE 'BIND_NOW|FLAGS.*NOW' \
+  grep -qE 'BIND_NOW|FLAGS.*NOW' <<< "$DYNAMIC" \
     || { echo "FAIL: not full RELRO, BIND_NOW is absent" >&2; fail=1; }
   # A GNU_STACK marked RWE means an executable stack.
-  printf '%s\n' "$HEADERS" | grep 'GNU_STACK' | grep -q 'RWE' \
+  STACK_LINE="$(grep 'GNU_STACK' <<< "$HEADERS" || true)"
+  grep -q 'RWE' <<< "$STACK_LINE" \
     && { echo "FAIL: executable stack" >&2; fail=1; }
 
   [ "$fail" -eq 0 ] || exit 1

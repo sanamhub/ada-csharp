@@ -90,7 +90,7 @@ jobs:
         if: matrix.rid == 'linux-x64'
         shell: bash
         run: |
-          found="$(find tests -name system-uri-differences.md -path '*/bin/*' | head -1)"
+          found="$(find tests -name system-uri-differences.md -path '*/bin/*' -print -quit)"
           if [ -n "$found" ]; then
             cp "$found" docs/system-uri-differences.md
             echo "### System.Uri differences" >> "$GITHUB_STEP_SUMMARY"

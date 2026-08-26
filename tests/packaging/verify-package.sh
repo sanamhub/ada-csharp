@@ -23,8 +23,17 @@ done
 [ -n "$PACKAGE_DIR" ] || { echo "--package-dir is required" >&2; exit 2; }
 
 PACKAGE_DIR="$(cd "$PACKAGE_DIR" && pwd)"
-VERSION="$(ls "$PACKAGE_DIR"/Ada.Url.*.nupkg | head -1 | sed 's/.*Ada\.Url\.\(.*\)\.nupkg/\1/')"
-[ -n "$VERSION" ] || { echo "no Ada.Url package found in $PACKAGE_DIR" >&2; exit 1; }
+
+# Glob and index, with no pipe for head to close early. Under pipefail a closed pipe kills the
+# writer with SIGPIPE and the whole line reports as failed.
+PACKAGES=("$PACKAGE_DIR"/Ada.Url.*.nupkg)
+if [ ! -f "${PACKAGES[0]}" ]; then
+  echo "no Ada.Url package found in $PACKAGE_DIR" >&2
+  exit 1
+fi
+VERSION="$(basename "${PACKAGES[0]}" .nupkg)"
+VERSION="${VERSION#Ada.Url.}"
+[ -n "$VERSION" ] || { echo "could not read a version from ${PACKAGES[0]}" >&2; exit 1; }
 
 # Under Git Bash, pwd returns an MSYS path like /d/a/repo/out, and .NET reads that as
 # C:\d\a\repo\out, which does not exist. Anything handed to a .NET tool or to Python needs the

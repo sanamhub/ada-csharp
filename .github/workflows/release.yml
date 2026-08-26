@@ -77,7 +77,7 @@ jobs:
             [ -d "$d" ] || continue
             mv "$d" "${d#native-}"
           done
-          ls -R . | head -40
+          ls -R . | head -40 || true
 
       # The gate is active here: a release package missing any RID fails to pack.
       - name: pack
@@ -208,6 +208,24 @@ jobs:
           --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+      # Everything before this tested a local artifact. This tests what nuget.org actually
+      # serves, which is the only thing a user ever sees. Indexing lags a push by a minute or
+      # two, so it retries rather than failing on the first miss.
+      - name: verify the published package
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for attempt in 1 2 3 4 5 6; do
+            if ./tests/packaging/verify-published.sh --version "$version"; then
+              exit 0
+            fi
+            echo "attempt $attempt did not find it yet, waiting for nuget.org indexing"
+            sleep 30
+          done
+          echo "::error::Ada.Url $version never became usable from nuget.org"
+          exit 1
 
       - uses: softprops/action-gh-release@v2
         if: github.event_name == 'push'

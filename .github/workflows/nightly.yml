@@ -122,7 +122,7 @@ jobs:
       - name: compare the vendored corpus against upstream
         id: drift
         run: |
-          pinned="$(grep -oE '[0-9a-f]{40}' tests/Ada.Url.Tests/vectors/PROVENANCE.md | head -1)"
+          pinned="$(grep -oE -m1 '[0-9a-f]{40}' tests/Ada.Url.Tests/vectors/PROVENANCE.md)"
           latest="$(curl -sS 'https://api.github.com/repos/web-platform-tests/wpt/commits?path=url/resources&per_page=1' | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["sha"])')"
           echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
           echo "latest=$latest" >> "$GITHUB_OUTPUT"

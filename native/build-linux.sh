@@ -95,11 +95,11 @@ cmake --build "$BUILD" --parallel
 # real file under the plain name. The managed side asks the loader for "ada", which the platform
 # turns into libada.so.
 mkdir -p "$OUT"
-# head closes the pipe early, which kills find with SIGPIPE and trips pipefail. Turn it off
-# for exactly this line rather than losing the protection everywhere else.
-set +o pipefail
-BUILT="$(find "$BUILD" -name 'libada.so*' -not -name '*.unstripped' | head -1)"
-set -o pipefail
+# No pipe at all. Capture everything, then take the first line in the shell. head would close
+# the pipe early, kill find with SIGPIPE, and pipefail would report the whole thing as failed.
+ALL_BUILT="$(find "$BUILD" -name 'libada.so*' -not -name '*.unstripped')"
+BUILT="${ALL_BUILT%%$'
+'*}"
 if [ -z "$BUILT" ]; then
   echo "build produced no libada.so. What it did produce:" >&2
   find "$BUILD" -name '*.so*' >&2
