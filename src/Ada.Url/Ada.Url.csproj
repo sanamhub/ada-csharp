@@ -34,11 +34,40 @@
   </ItemGroup>
 
   <!--
-    Native assets are added at P1 by native.yml (ADA_WRAPPER_PLAN.md §2.5):
-      <None Include="$(NativeRoot)win-x64\ada.dll" Pack="true"
-            PackagePath="runtimes/win-x64/native/" CopyToOutputDirectory="PreserveNewest" />
-    ... one line per RID. Not present yet, so this package is managed-only until P1 lands.
+    Native assets, one entry per shipped RID, taken from artifacts/native/<rid>/ which is where
+    native.yml writes and where the release workflow downloads them to.
+
+    Wildcards rather than literal file names. A literal Include of a missing file is a build
+    error, while a wildcard that matches nothing is silently empty, so a developer with no C++
+    toolchain can still build and test the managed side.
+
+    Silence at pack time is the danger, so the gate is on the pack instead. Before this target
+    existed, dotnet pack happily produced a package with no runtimes/ folder at all, which
+    installs fine and then throws DllNotFoundException on the consumer's first call.
   -->
+  <PropertyGroup>
+    <AdaNativeRoot Condition="'$(AdaNativeRoot)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\native\</AdaNativeRoot>
+    <AdaShippedRids>win-x64;linux-x64;linux-arm64;linux-musl-x64;osx-x64;osx-arm64</AdaShippedRids>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(AdaNativeRoot)win-x64\*.dll" Pack="true" PackagePath="runtimes/win-x64/native/" Visible="false" />
+    <None Include="$(AdaNativeRoot)linux-x64\*.so" Pack="true" PackagePath="runtimes/linux-x64/native/" Visible="false" />
+    <None Include="$(AdaNativeRoot)linux-arm64\*.so" Pack="true" PackagePath="runtimes/linux-arm64/native/" Visible="false" />
+    <None Include="$(AdaNativeRoot)linux-musl-x64\*.so" Pack="true" PackagePath="runtimes/linux-musl-x64/native/" Visible="false" />
+    <None Include="$(AdaNativeRoot)osx-x64\*.dylib" Pack="true" PackagePath="runtimes/osx-x64/native/" Visible="false" />
+    <None Include="$(AdaNativeRoot)osx-arm64\*.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="VerifyNativeAssets" BeforeTargets="GenerateNuspec">
+    <ItemGroup>
+      <_AdaExpectedRid Include="$(AdaShippedRids)" />
+      <_AdaMissingRid Include="@(_AdaExpectedRid)" Condition="!Exists('$(AdaNativeRoot)%(Identity)')" />
+    </ItemGroup>
+
+    <Error Condition="'@(_AdaMissingRid)' != '' and '$(AllowPartialNativePack)' != 'true'"
+           Text="Cannot pack Ada.Url: no native library for @(_AdaMissingRid, ', '). Build with native/build-* or download the native.yml artifacts into $(AdaNativeRoot). AllowPartialNativePack=true bypasses this for a local smoke test only, never for a release." />
+  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ada.Url.Tests" />
