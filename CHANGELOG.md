@@ -5,7 +5,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- The nuget.org page had no project website link. `PackageProjectUrl` was never set.
 
 ## [0.1.0-beta.1] - 2026-08-26
 

@@ -16,6 +16,8 @@
     <Version>0.1.0-beta.1</Version>
     <Description>Zero-allocation .NET wrapper around the Ada WHATWG-compliant URL parser.</Description>
     <PackageTags>url;uri;whatwg;parser;ada;idna;performance</PackageTags>
+    <!-- Without this the nuget.org page shows no project website link at all. -->
+    <PackageProjectUrl>https://github.com/sanamhub/ada-csharp</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
