@@ -6,9 +6,22 @@ namespace Ada.Url;
 /// Byte offsets of each URL component within the serialised href.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Every field can hold <see cref="Omitted"/>, meaning the component is absent. That value is
 /// <c>uint.MaxValue</c>, so casting an omitted field to <see cref="int"/> gives -1 and an out of
 /// range slice. Check with <see cref="IsPresent"/> before using any of them.
+/// </para>
+/// <para>
+/// <see cref="HostStart"/> points at the <c>@</c> rather than at the host when the URL carries
+/// credentials, so slicing <c>href[HostStart..HostEnd]</c> yields <c>@example.com</c> for
+/// <c>https://user:pw@example.com/</c>. Without credentials the same slice is correct. Use
+/// <c>AdaUrl.Hostname</c> unless you specifically want the offsets.
+/// </para>
+/// <para>
+/// These are offsets, not a description of the whole URL. Nothing records where the path ends,
+/// so two URLs that share a scheme and host compare equal here however much their paths differ.
+/// Component equality is not URL equality; compare <c>AdaUrl.Href</c> for that.
+/// </para>
 /// </remarks>
 public readonly struct AdaUrlComponents : IEquatable<AdaUrlComponents>
 {

@@ -177,11 +177,36 @@ public class SurfaceCoverageTests
     }
 
     [Fact]
+    public void Components_AreOffsetsSoDifferentPathsCanCompareEqual()
+    {
+        // Not a bug, and worth pinning because it surprises. The struct holds offsets and has no
+        // field for where the path ends, so https://example.com/a and
+        // https://example.com/completely/different produce byte identical components: same
+        // protocolEnd, same hostEnd, same pathnameStart, and nothing that records the rest.
+        //
+        // Anyone treating component equality as URL equality gets a wrong answer here. Compare
+        // Href for that.
+        Assert.True(AdaUrl.TryParse("https://example.com/a"u8, out AdaUrl shortPath));
+        Assert.True(AdaUrl.TryParse("https://example.com/completely/different"u8, out AdaUrl longPath));
+
+        using (shortPath)
+        using (longPath)
+        {
+            Assert.Equal(shortPath.Components, longPath.Components);
+            Assert.NotEqual(
+                Encoding.UTF8.GetString(shortPath.Href),
+                Encoding.UTF8.GetString(longPath.Href));
+        }
+    }
+
+    [Fact]
     public void Components_CompareByValue()
     {
         Assert.True(AdaUrl.TryParse("https://example.com/a"u8, out AdaUrl first));
         Assert.True(AdaUrl.TryParse("https://example.com/a"u8, out AdaUrl second));
-        Assert.True(AdaUrl.TryParse("https://example.com/completely/different"u8, out AdaUrl third));
+
+        // Differs in host length, port, query and fragment, so the offsets genuinely move.
+        Assert.True(AdaUrl.TryParse("https://a-much-longer-host.example:8443/a?q=1#f"u8, out AdaUrl third));
 
         using (first)
         using (second)
