@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Ada.Url.Benchmarks/Ada.Url.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Ada.Url/Ada.Url.csproj" />
   </Folder>

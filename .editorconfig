@@ -52,6 +52,9 @@ dotnet_diagnostic.CA1515.severity = none    # test classes must be public for th
 dotnet_diagnostic.CS1591.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1515.severity = none
+# BenchmarkDotNet discovers instance methods on the benchmark class. Making them static to
+# please the analyzer would change what it measures.
+dotnet_diagnostic.CA1822.severity = none
 
 [src/**.cs]
 # The C ABI returns uint8_t for these, so byte is the correct underlying type. Widening to int
