@@ -16,6 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The corpus is the specification this library is tested against, so it has to reach the
+         output directory. If it does not, the suite passes by running nothing. -->
+    <Content Include="vectors\**" CopyToOutputDirectory="PreserveNewest" LinkBase="vectors" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Ada.Url\Ada.Url.csproj" />
   </ItemGroup>
 
