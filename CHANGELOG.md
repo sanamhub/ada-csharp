@@ -5,6 +5,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Benchmark `W4`, which measures the gap between validating a URL and parsing one. About two
+  thirds of a parse is `ada_parse` allocating a URL object and `ada_free` releasing it, so the
+  gap is now tracked rather than rediscovered.
+
+### Changed
+
+- README performance section reports sustained throughput over ten million URLs alongside the
+  existing per call figures. The headline said "roughly twice as fast as `System.Uri`", which
+  came from a single URL microbenchmark with a hot cache. Under sustained load it is about 4x on
+  validation and 1.2x on a full parse, with the allocation difference unchanged.
+
 ### Fixed
 
 - The nuget.org page had no project website link. `PackageProjectUrl` was never set.

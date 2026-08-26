@@ -10,7 +10,8 @@ WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url
 Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers, Telegram,
 Datadog, Kong and Redpanda. This package brings the same parser, and the same results, to .NET.
 
-Roughly twice as fast as `System.Uri` on a plain URL, and allocation free on the UTF-8 path.
+About 4x faster to validate a URL, 1.2x to parse one, and allocation free on the UTF-8 path
+where `System.Uri` costs around 370 bytes each.
 
 ```csharp
 using var url = AdaUrl.Parse("https://example.org/path/../file.txt"u8);
@@ -112,6 +113,10 @@ AdaIdna.ToUnicode("xn--bcher-kva.example");   // bücher.example
 
 The first three rows allocate **nothing at all**. Not less, none.
 
+These are single URL microbenchmarks with a hot cache. Under sustained load the parse
+advantage narrows to about 1.2x, while the validation advantage and the allocation
+difference hold. See sustained throughput below.
+
 ### A hard URL
 
 Credentials, a non default port, an internationalised host, dot segments and a heavy percent
@@ -126,6 +131,43 @@ encoded query:
 Both parsers slow down here, because IDNA and percent decoding are genuinely expensive. The gap
 that widens is allocation: **2,160 bytes against nothing**.
 
+### Sustained throughput
+
+The tables above time one URL at a time with a hot cache, which is what a microbenchmark measures.
+This is ten million parses over a corpus of a million distinct URLs, on one thread of a 16 core
+x64 desktop, using the published package.
+
+| Work | Rate | Per URL | Allocated |
+| --- | ---: | ---: | --- |
+| `AdaUrl.CanParse(utf8)` | **6.1 M/s** | 165 ns | **0 B**, zero gen0 collections |
+| `AdaUrl.TryParse` then `Hostname` | **1.95 M/s** | 513 ns | **0 B**, zero gen0 collections |
+| `AdaUrl.TryParse` then 5 components | 1.9 M/s | 522 ns | **0 B**, zero gen0 collections |
+| `Uri.IsWellFormedUriString` | 1.55 M/s | 644 ns | 309 B, 32 gen0 per million |
+| `Uri.TryCreate` then `.Host` | 1.61 M/s | 619 ns | 374 B, 39 gen0 per million |
+
+So **3.9x on validation, 1.2x on a full parse**, and no allocation against 374 bytes per URL.
+
+Throughput held between 1.8 and 2.0 M/s whether the working set was 6 KiB or 60 MiB, so this is
+not a cache effect. Across 16 threads it reaches 8.7 to 9.4 M/s. Two threads scale at 1.99x, so
+nothing serialises at the interop boundary; beyond that it is memory bandwidth bound.
+
+### Why a parse costs more than a validation
+
+| | Per URL |
+| --- | ---: |
+| `CanParse`, nothing kept | 165 ns |
+| `TryParse` then `Dispose` | 505 ns |
+| difference | **340 ns** |
+
+That gap is neither parsing nor P/Invoke, which costs a couple of nanoseconds a call. `ada_parse`
+heap allocates a URL object and `ada_free` releases it, and that pair is about two thirds of what
+a parse costs. `ada_c.h` has no way to parse into caller supplied storage, so it is an upstream
+limit rather than something this package can route around.
+
+The practical consequence: if you only need to know whether a string is a URL, call `CanParse`.
+It is three times faster than parsing and discarding the result. Benchmark `W4` measures this
+gap on every run so a future improvement, or regression, shows up as a number.
+
 ### Which number matters
 
 Speed is the headline; allocation is usually the one that changes a capacity plan. A service
@@ -138,9 +180,17 @@ quoted and the other implied.
 
 ### Caveats
 
-Measured on a GitHub hosted `ubuntu-24.04` runner, x64. Ratios are trustworthy, since both
-parsers ran in the same process on the same machine. **Absolute nanoseconds are indicative
-only**, because a shared CI runner has noisy neighbours and no frequency guarantee.
+The per call tables were measured on a GitHub hosted `ubuntu-24.04` runner, x64. The sustained
+throughput figures were measured on a 16 core x64 desktop, Windows, workstation GC, against the
+published package restored from nuget.org.
+
+Ratios are trustworthy, since both parsers ran in the same process on the same machine.
+**Absolute nanoseconds and rates are indicative only**: a shared CI runner has noisy neighbours
+and no frequency guarantee, and your hardware is not this hardware.
+
+The two parsers do not implement the same specification, so speed is only half of the comparison.
+`System.Uri` follows RFC 3986 and 3987; this follows WHATWG. They disagree on real inputs, which
+is what [`docs/system-uri-differences.md`](docs/system-uri-differences.md) is for.
 
 Results for Linux arm64, Windows x64 and macOS arm64, plus the thousand URL batch workload and
 the UTF-16 transcode cost by input length, are in
