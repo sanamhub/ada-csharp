@@ -48,7 +48,7 @@ jobs:
     steps:
       # TODO(P1): pin third-party actions by full commit SHA (org section 7 supply chain).
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -102,7 +102,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - uses: github/codeql-action/init@v3
