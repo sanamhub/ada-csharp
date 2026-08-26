@@ -75,3 +75,8 @@ dotnet_diagnostic.CA2000.severity = none
 # A nested struct enumerator is the standard shape for allocation free iteration, the same one
 # List<T>.Enumerator uses. Lifting it out of the type would gain nothing and read worse.
 dotnet_diagnostic.CA1034.severity = none
+
+[benchmarks/**/*.cs]
+# The shuffle needs to be reproducible, not unpredictable. A seeded Random is the point: a
+# benchmark whose input order changes between runs cannot detect a regression.
+dotnet_diagnostic.CA5394.severity = none

@@ -1,21 +1,23 @@
 name: bench
 
-# Runs the benchmark harness and uploads the results.
+# Runs the benchmark harness on every architecture we ship, and collates the results.
 #
 # Deliberately not a gate. Shared runners are far too noisy for nanosecond thresholds, and a
 # flaky performance gate gets disabled within a month, taking real coverage with it. Allocation
 # is what gets gated, and that happens in the test suite where it is deterministic.
 #
-# Treat the ratios here as meaningful and the absolute nanosecond figures as indicative. For
-# numbers worth publishing, run this on a pinned machine.
+# Ratios are comparable within a platform, because both parsers ran in the same process on the
+# same machine. Absolute nanoseconds are not comparable between platforms, because the runners
+# are different hardware. The summary leads with ratios and allocation for that reason.
 
 on:
   workflow_dispatch:
     inputs:
       filter:
-        description: 'BenchmarkDotNet filter, for example *W1* or *Complex*'
+        description: 'BenchmarkDotNet filter, for example *W1* or *Batch*'
         type: string
         default: '*'
+  workflow_call:
   schedule:
     - cron: '0 3 * * *'
 
@@ -32,22 +34,35 @@ env:
 
 jobs:
   natives:
-    # The benchmark runs on linux-x64, so there is no reason to build five other RIDs and wait
-    # on the slowest runner in the pool.
+    # One RID per platform the benchmark runs on. macos-13 is excluded: an Intel Mac figure is
+    # not worth the queue it costs.
     uses: ./.github/workflows/native.yml
     with:
-      rids: '[{"rid":"linux-x64","os":"ubuntu-24.04"}]'
+      rids: >-
+        [{"rid":"linux-x64","os":"ubuntu-24.04"},
+         {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
+         {"rid":"win-x64","os":"windows-2022"},
+         {"rid":"osx-arm64","os":"macos-14"}]
 
   run:
+    name: bench (${{ matrix.rid }})
     needs: natives
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64,   os: ubuntu-24.04,     arch: 'x64, Linux, GitHub hosted' }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, arch: 'arm64, Linux, GitHub hosted' }
+          - { rid: win-x64,     os: windows-2022,     arch: 'x64, Windows, GitHub hosted' }
+          - { rid: osx-arm64,   os: macos-14,         arch: 'arm64, Apple Silicon, GitHub hosted' }
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v7
         with:
-          name: native-linux-x64
-          path: artifacts/native/linux-x64
+          name: native-${{ matrix.rid }}
+          path: artifacts/native/${{ matrix.rid }}
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -68,6 +83,7 @@ jobs:
       # BenchmarkDotNet exits 0 when its own validation rejects the run, so a broken harness
       # otherwise produces a green job that measured nothing. That already happened once.
       - name: fail if nothing was measured
+        shell: bash
         run: |
           shopt -s nullglob
           results=(BenchmarkDotNet.Artifacts/results/*.md)
@@ -77,18 +93,55 @@ jobs:
           fi
           echo "produced ${#results[@]} result file(s)"
 
-      - name: show the summary in the job log
-        if: always()
+      - name: label the results with their platform
+        shell: bash
         run: |
-          for f in BenchmarkDotNet.Artifacts/results/*.md; do
-            [ -f "$f" ] || continue
-            echo "### $(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
-            cat "$f" >> "$GITHUB_STEP_SUMMARY"
-          done
+          mkdir -p out
+          {
+            echo "# ${{ matrix.rid }}"
+            echo
+            echo "Hardware: ${{ matrix.arch }}."
+            echo
+            echo "Ratios are comparable within this file. Absolute nanoseconds are not comparable"
+            echo "with another platform's file, because the hardware differs."
+            echo
+            for f in BenchmarkDotNet.Artifacts/results/*.md; do
+              cat "$f"
+              echo
+            done
+          } > "out/${{ matrix.rid }}.md"
+          head -50 "out/${{ matrix.rid }}.md" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: benchmark-results
-          path: BenchmarkDotNet.Artifacts/results
+          name: benchmark-${{ matrix.rid }}
+          path: |
+            out/${{ matrix.rid }}.md
+            BenchmarkDotNet.Artifacts/results/*.json
           retention-days: 30
+
+  collate:
+    name: collate
+    needs: run
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: benchmark-*
+          path: results
+
+      - name: build the summary and the detail pages
+        run: python3 scripts/collate-benchmarks.py results out
+
+      - name: show the summary in the job log
+        if: always()
+        run: cat out/README.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: benchmarks-collated
+          path: out
+          retention-days: 90

@@ -93,23 +93,53 @@ AdaIdna.ToUnicode("xn--bcher-kva.example");   // bücher.example
 
 ## Performance
 
-Measured on a GitHub hosted `ubuntu-24.04` runner. Ratios are trustworthy, absolute nanoseconds
-are indicative. Full results and caveats in [`docs/benchmarks/`](docs/benchmarks/0.1.0-alpha/).
+### A plain URL
 
-`https://example.com/path`:
+`https://example.com/path`
 
-| | Mean | vs `System.Uri` | Allocated |
-| --- | ---: | ---: | ---: |
-| `CanParse` | 47 ns | 0.26x | **0 B** |
-| Parse, span in and span out | 92 ns | 0.50x | **0 B** |
-| Parse, string in and string out | 122 ns | 0.66x | 72 B |
-| `System.Uri` | 185 ns | 1.00x | 288 B |
+| What you are doing | Ada.Url | `System.Uri` | | Allocated |
+| --- | ---: | ---: | --- | --- |
+| Check it is a valid URL | **47 ns** | 185 ns | 3.9x faster | 0 B against 288 B |
+| Parse, read host, path and query | **92 ns** | 185 ns | 2.0x faster | 0 B against 288 B |
+| Parse, read all ten components | **101 ns** | 185 ns | 1.8x faster | 0 B against 288 B |
+| Parse, return the URL as a `string` | **122 ns** | 185 ns | 1.5x faster | 72 B against 288 B |
 
-A complex URL with credentials, an internationalised host, dot segments and a heavy query costs
-1,139 ns and 0 B, against 1,684 ns and 2,160 B for `System.Uri`.
+The first three rows allocate **nothing at all**. Not less, none.
 
-The allocation gap is the wider story. Parsing thousands of URLs a second, 2,160 bytes each is
-what shows up as GC pressure.
+### A hard URL
+
+Credentials, a non default port, an internationalised host, dot segments and a heavy percent
+encoded query:
+
+| What you are doing | Ada.Url | `System.Uri` | | Allocated |
+| --- | ---: | ---: | --- | --- |
+| Normalise into your own buffer | **1,134 ns** | 1,684 ns | 1.5x faster | 0 B against 2,160 B |
+| Parse and read four components | **1,139 ns** | 1,684 ns | 1.5x faster | 0 B against 2,160 B |
+| Parse and return a `string` | **1,374 ns** | 1,684 ns | 1.2x faster | 392 B against 2,160 B |
+
+Both parsers slow down here, because IDNA and percent decoding are genuinely expensive. The gap
+that widens is allocation: **2,160 bytes against nothing**.
+
+### Which number matters
+
+Speed is the headline; allocation is usually the one that changes a capacity plan. A service
+parsing 50,000 URLs a second allocates about 100 MB a second through `System.Uri` and nothing at
+all through the span path, and that difference is GC pauses rather than nanoseconds.
+
+To get zero allocation you have to pass UTF-8 and read spans. Hand it a `string` and ask for a
+`string` back and you still win, by less. Both paths are measured above rather than one being
+quoted and the other implied.
+
+### Caveats
+
+Measured on a GitHub hosted `ubuntu-24.04` runner, x64. Ratios are trustworthy, since both
+parsers ran in the same process on the same machine. **Absolute nanoseconds are indicative
+only**, because a shared CI runner has noisy neighbours and no frequency guarantee.
+
+Results for Linux arm64, Windows x64 and macOS arm64, plus the thousand URL batch workload and
+the UTF-16 transcode cost by input length, are in
+[`docs/benchmarks/`](docs/benchmarks/). Reproduce any of it with
+`dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks`.
 
 ## How it works
 
