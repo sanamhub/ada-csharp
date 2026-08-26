@@ -23,6 +23,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Benchmark `W1` compared `CanParse` against `new Uri()` plus reading three components, which is
+  not the same work, and the README repeated the result as "about 4x faster to validate". Against
+  the cheapest equivalent, `Uri.TryCreate` discarded, validation is about 1.3x faster on a plain
+  URL and slightly slower on a corpus heavy in internationalised hosts. `CanParse` now has its
+  own category, `W0 validate`, with a like for like baseline, and the README says what the
+  measurements support.
 - The benchmark collation produced a summary with no comparison in it. Every ratio printed as
   `n/a` and every benchmark was grouped under a heading called "other", because the script read
   BenchmarkDotNet's JSON export, which carries neither a `Categories` field nor a baseline

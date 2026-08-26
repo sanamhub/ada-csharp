@@ -29,10 +29,15 @@ frequency guarantee. Per platform detail is linked at the end.
 **Zero allocation holds on every platform.** Every span in, span out row reports 0 B. That is
 also asserted deterministically in the test suite, because a shared runner cannot gate anything.
 
-**Validation is the biggest win, everywhere.** `CanParse` runs at 0.24x to 0.30x of
-`System.Uri`, so three to four times faster, on all four platforms.
+**The `CanParse` ratio in W1 below is not a like for like comparison.** Its baseline is
+`new Uri()` followed by reading three components, so it measures validation against parsing and
+reading. Against the cheapest equivalent, `Uri.TryCreate` with the result discarded, `CanParse`
+is about 1.3x faster on a plain URL and slightly slower on the W3 corpus, which is heavy in
+internationalised hosts. The benchmark now carries a `W0 validate` category with the correct
+baseline; these results predate it.
 
-**A full parse is 1.9x on Linux x64, 1.4x on macOS arm64, and about level on Windows x64.**
+**A full parse is 1.9x on Linux x64, 1.9x on Linux arm64, 1.4x on macOS arm64, and about level
+on Windows x64.** Those rows are like for like: both sides parse and read three components.
 
 **W4 shows where parse time goes.** Parsing and disposing costs 2.2x to 3.1x what validating
 costs, and the gap is flat from a 100 URL working set to 200,000, so it is not cache behaviour.

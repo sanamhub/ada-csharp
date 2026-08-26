@@ -72,7 +72,19 @@ public class UrlBenchmarks
         return uri.Host.Length + uri.AbsolutePath.Length + uri.Query.Length;
     }
 
-    [Benchmark, BenchmarkCategory("W1")]
+    // -------------------------------------------------------------------------------------
+    // W0, validation only
+    //
+    // CanParse used to sit in W1, where the baseline is `new Uri()` followed by reading three
+    // components. That compares validating against parsing and reading, which is not the same
+    // work, and it made validation look about four times faster than it is. The baseline here
+    // is the cheapest way System.Uri can answer the same question.
+    // -------------------------------------------------------------------------------------
+
+    [Benchmark(Baseline = true), BenchmarkCategory("W0 validate")]
+    public bool SystemUri_Basic_Validate() => Uri.TryCreate(BasicUrl, UriKind.Absolute, out _);
+
+    [Benchmark, BenchmarkCategory("W0 validate")]
     public bool Ada_Basic_CanParse() => AdaUrl.CanParse(_basicUtf8);
 
     [Benchmark, BenchmarkCategory("W1")]
