@@ -6,8 +6,18 @@
    notes are built from that section, so it is the text people will actually read.
 2. `src/Ada.Url/Ada.Url.csproj` has the matching `<Version>`.
 3. `native/CHECKSUMS.txt` matches the natives the release will build. It is produced by the
-   `manifest` job in `native.yml`. If upstream Ada moved, this file has to be regenerated and
-   committed, or the release fails its verification step, which is the intended behaviour.
+   `manifest` job in `native.yml`. If the upstream Ada tag or a build script changed, regenerate
+   and commit it, or the release fails verification, which is the intended behaviour.
+
+   To regenerate: run the `native` workflow, open the `manifest` job, and copy its combined
+   output. Only change this file for a reason you can name. It exists so a binary that changed
+   without one stops the release, and every builds-are-not-reproducible workaround ends with
+   somebody regenerating it on autopilot, which is exactly the habit an attacker relies on.
+
+   All six RIDs are reproducible: the same source and flags give byte identical output. The
+   `reproducible build` workflow builds win-x64 and linux-x64 twice from scratch every week and
+   fails if the two differ. Windows needs `/Brepro` and `/PDBALTPATH` for this, since MSVC
+   otherwise stamps the build time and a fresh PDB signature into every binary.
 4. `PublicAPI.Unshipped.txt` entries are moved to `PublicAPI.Shipped.txt` for a stable release.
 5. CI is green on `main`.
 
