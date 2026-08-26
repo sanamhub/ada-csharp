@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Builds Ada as a shared library for a Linux RID.
 #
-# Baseline is x86-64-v2 with ADA_USE_SIMDUTF=ON, not a static AVX2 build. simdutf picks its
-# kernel at runtime, so we keep the SIMD speed without raising the minimum CPU. See ADR-0003.
+# Baseline is x86-64-v2, not a static AVX2 build, so the artifact runs on any CPU from 2009
+# onward instead of raising the floor to Haswell.
+#
+# ADA_USE_SIMDUTF is OFF. With BUILD_SHARED_LIBS=ON it propagates to simdutf and builds it as a
+# second shared library, which breaks the Windows build and would add a runtime dependency to
+# ship. Ada keeps its own SIMD paths either way. See ADR-0003.
 set -euo pipefail
 
 ADA_TAG=""
@@ -64,7 +68,7 @@ cmake -S "$SRC" -B "$BUILD" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=ON \
   -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF \
-  -DADA_USE_SIMDUTF=ON \
+  -DADA_USE_SIMDUTF=OFF \
   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION="$LTO" \
   -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
@@ -73,11 +77,19 @@ cmake -S "$SRC" -B "$BUILD" -G Ninja \
 
 cmake --build "$BUILD" --parallel
 
-# NuGet does not preserve symlinks, so resolve libada.so -> libada.so.4.0.0 and copy the real
-# file under the plain name. The managed side asks the loader for "ada", which becomes libada.so.
+# CMake writes the target under src/, not the build root.
+#
+# NuGet does not preserve symlinks either, so resolve libada.so -> libada.so.4.0.0 and copy the
+# real file under the plain name. The managed side asks the loader for "ada", which the platform
+# turns into libada.so.
 mkdir -p "$OUT"
-REAL="$(readlink -f "$BUILD/libada.so")"
-[ -f "$REAL" ] || { echo "build produced no libada.so" >&2; exit 1; }
+BUILT="$(find "$BUILD" -name 'libada.so*' -not -name '*.unstripped' | head -1)"
+if [ -z "$BUILT" ]; then
+  echo "build produced no libada.so. What it did produce:" >&2
+  find "$BUILD" -name '*.so*' >&2
+  exit 1
+fi
+REAL="$(readlink -f "$BUILT")"
 cp "$REAL" "$OUT/libada.so"
 
 if [ -z "$SANITIZE" ]; then

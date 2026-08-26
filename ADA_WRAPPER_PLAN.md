@@ -68,7 +68,7 @@ Cut after a minimality review. Each was defensible. None was worth its cost.
 | Custom Roslyn analyzer for a missing `using` | An analyzer project plus a test project to catch one mistake. Handled instead by making the handle free API the primary surface, so most callers never own a handle. |
 | Span wrapper with a generation counter | It would appear in the signature of every getter, taxing the path that has to stay free. Replaced by contract, tests, and ASAN. |
 | Always on `EventCounter` handle tracking | This was a real defect in the first draft. An `Interlocked.Increment` per parse is measurable against a 50 ns operation. Now `ADA_DIAGNOSTICS` builds only. |
-| A separate AVX2 pinned package | `ADA_USE_SIMDUTF=ON` gives runtime dispatched SIMD, which is what the requirement actually wants. A second package with a hidden CPU floor is a footgun. |
+| A separate AVX2 pinned package | A hidden CPU floor for a few percent on a workload nobody has measured. A second package is also a second thing to build, sign, version, and support. |
 | Per RID runtime packages via `runtime.json` | One package. Revisit if the native grows. |
 | Nightly fuzzing lane | Upstream fuzzes the native side. Our surface is transcode and length arithmetic, covered by property based tests in the normal suite. |
 | valgrind, Application Verifier, macOS `leaks`, RSS slope tracking | Four extra leak mechanisms on top of ASAN. Our code is platform independent, so Linux ASAN plus handle counters catch almost all of it. |
@@ -210,7 +210,7 @@ what a lint gate is for.
 | --- | :-: | :-: | --- |
 | `BUILD_SHARED_LIBS` | OFF | **ON** | We ship a shared library, so this has to be explicit |
 | `ADA_TESTING`, `ADA_BENCHMARKS`, `ADA_TOOLS` | OFF | OFF | Release artifacts only |
-| `ADA_USE_SIMDUTF` | OFF | **ON**, pending the section 2.2 measurement | Runtime dispatched SIMD |
+| `ADA_USE_SIMDUTF` | OFF | **OFF** | Tried and rejected. With `BUILD_SHARED_LIBS=ON` it builds simdutf as a second shared library, which breaks the Windows build and adds a runtime dependency elsewhere. See ADR-0003. |
 | `ADA_USE_UNSAFE_STD_REGEX_PROVIDER` | OFF | OFF | Upstream test switch, never in a shipped artifact |
 | `CMAKE_INTERPROCEDURAL_OPTIMIZATION` | not set | **ON** | Portable LTO, plus explicit per compiler flags |
 | `WINDOWS_EXPORT_ALL_SYMBOLS` | YES | inherited | No `__declspec(dllexport)` patching needed on Windows |
@@ -225,13 +225,18 @@ The brief asked for AVX2 and BMI2 flags to keep Ada's SIMD speed. Compiling the 
 that way keeps it and raises the minimum CPU to Haswell, from 2013. Below that the process dies
 with `SIGILL`. Not a fallback, a crash, possibly on a customer VM with a masked feature set.
 
-Ship an `x86-64-v2` baseline with `ADA_USE_SIMDUTF=ON`. simdutf picks AVX-512, AVX2, or SSE
-kernels at runtime, so we get SIMD speed on the CPU actually running the code with no static
-floor. This is the correct reading of the requirement, not a compromise.
+Ship an `x86-64-v2` baseline. That keeps the floor at 2009 hardware, and Ada keeps its own SIMD
+paths regardless of build flags.
 
-`ADA_USE_SIMDUTF` is off by default upstream, so whether it wins is an empirical question.
-Measure once in P1, comparing simdutf on, simdutf off, and an AVX2 pinned reference build, and
-record the numbers in ADR-0003. The AVX2 build is a measurement, not a shipped artifact.
+The first attempt reached for `ADA_USE_SIMDUTF=ON`, since simdutf dispatches its kernel at
+runtime and looked like SIMD speed with no static floor. The first CI run killed that idea.
+`BUILD_SHARED_LIBS=ON` propagates into simdutf and builds it as a second shared library. On
+Windows `cmake -E __create_def` crashes with `0xC0000005` generating its exports. On Linux and
+macOS it works but leaves `libada.so` depending on `libsimdutf.so.25`, which means two binaries
+per RID and rpath handling. `BUILD_SHARED_LIBS` is global, so there is no command line way to
+link simdutf statically into a shared Ada.
+
+One shared object per RID, no simdutf. Recorded in ADR-0003.
 
 ### 2.3 RIDs and artifact names
 
@@ -260,7 +265,7 @@ git clone --depth 1 --branch v4.0.0 https://github.com/ada-url/ada.git ada-src
 cmake -S ada-src -B build/win-x64 -G "Visual Studio 17 2022" -A x64 ^
   -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON ^
   -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF ^
-  -DADA_USE_SIMDUTF=ON -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON ^
+  -DADA_USE_SIMDUTF=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON ^
   -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON ^
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL ^
   -DCMAKE_CXX_FLAGS_RELEASE="/O2 /Ob3 /Oi /GL /Gy /Gw /EHsc /DNDEBUG /Zi /guard:cf" ^
@@ -273,7 +278,7 @@ cmake --build build/win-x64 --config Release --parallel
 cmake -S ada-src -B build/linux-x64 -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
   -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF \
-  -DADA_USE_SIMDUTF=ON -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+  -DADA_USE_SIMDUTF=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
   -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
   -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -march=x86-64-v2 -mtune=generic \
@@ -299,7 +304,7 @@ for ARCH in x86_64 arm64; do
   cmake -S ada-src -B "build/osx-$ARCH" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
     -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF \
-    -DADA_USE_SIMDUTF=ON -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+    -DADA_USE_SIMDUTF=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
     -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON \
     -DCMAKE_OSX_ARCHITECTURES="$ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN" \
     -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -flto=thin -fvisibility=hidden -fstack-protector-strong $AF" \

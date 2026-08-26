@@ -3,8 +3,11 @@
 .SYNOPSIS
     Builds Ada as a shared library for win-x64.
 .DESCRIPTION
-    Baseline is x86-64-v2 with ADA_USE_SIMDUTF=ON, not a static AVX2 build. simdutf picks its
-    kernel at runtime, so we keep the SIMD speed without raising the minimum CPU. See ADR-0003.
+    Baseline is x86-64-v2, not a static AVX2 build, so the artifact runs on any CPU from 2009
+    onward instead of raising the floor to Haswell.
+
+    ADA_USE_SIMDUTF is OFF. With BUILD_SHARED_LIBS=ON it propagates to simdutf, and building
+    simdutf as a DLL crashes cmake -E __create_def while generating exports.def. See ADR-0003.
 
     MultiThreadedDLL matches the CRT that .NET processes already load. A static CRT inside a DLL
     sitting next to .NET is a heap mismatch waiting to happen.
@@ -39,7 +42,7 @@ cmake -S $src -B $build -G 'Visual Studio 17 2022' -A x64 `
     -DCMAKE_BUILD_TYPE=Release `
     -DBUILD_SHARED_LIBS=ON `
     -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF `
-    -DADA_USE_SIMDUTF=ON `
+    -DADA_USE_SIMDUTF=OFF `
     -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON `
     -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON `
     -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL `
@@ -53,7 +56,11 @@ if ($LASTEXITCODE -ne 0) { throw "cmake build failed with exit code $LASTEXITCOD
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 $dll = Get-ChildItem -Path $build -Filter 'ada.dll' -Recurse -File | Select-Object -First 1
-if (-not $dll) { throw 'build produced no ada.dll' }
+if (-not $dll) {
+    Write-Output 'build produced no ada.dll. What it did produce:'
+    Get-ChildItem -Path $build -Filter '*.dll' -Recurse -File | ForEach-Object { $_.FullName }
+    throw 'build produced no ada.dll'
+}
 Copy-Item $dll.FullName (Join-Path $out 'ada.dll') -Force
 
 # The PDB goes to a symbol server, not into the package. Keep it as a separate CI artifact so

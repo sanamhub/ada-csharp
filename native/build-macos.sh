@@ -41,7 +41,7 @@ cmake -S "$SRC" -B "$BUILD" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=ON \
   -DADA_TESTING=OFF -DADA_BENCHMARKS=OFF -DADA_TOOLS=OFF \
-  -DADA_USE_SIMDUTF=ON \
+  -DADA_USE_SIMDUTF=OFF \
   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
   -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON \
   -DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH" \
@@ -51,16 +51,16 @@ cmake -S "$SRC" -B "$BUILD" -G Ninja \
 
 cmake --build "$BUILD" --parallel
 
-# CMake may emit libada.dylib or libada.4.dylib depending on the SOVERSION handling.
+# CMake writes the target under src/, and names it libada.dylib or libada.4.dylib depending on
+# how it handles SOVERSION.
 mkdir -p "$OUT"
-REAL=""
-for candidate in "$BUILD/libada.dylib" "$BUILD/libada.4.dylib"; do
-  if [ -f "$candidate" ] || [ -L "$candidate" ]; then
-    REAL="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$candidate")"
-    break
-  fi
-done
-[ -n "$REAL" ] && [ -f "$REAL" ] || { echo "build produced no dylib" >&2; exit 1; }
+BUILT="$(find "$BUILD" -name 'libada*.dylib' | head -1)"
+if [ -z "$BUILT" ]; then
+  echo "build produced no dylib. What it did produce:" >&2
+  find "$BUILD" -name '*.dylib' >&2
+  exit 1
+fi
+REAL="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$BUILT")"
 cp "$REAL" "$OUT/libada.dylib"
 
 # Unsigned dylibs are increasingly blocked on recent macOS. The identity comes from the CI

@@ -10,6 +10,10 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="3.11.0-beta1.24629.2" />
   </ItemGroup>
 
+  <ItemGroup Label="Benchmarks">
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.2" />
+  </ItemGroup>
+
   <ItemGroup Label="Test">
     <PackageVersion Include="xunit.v3" Version="1.1.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.1" />

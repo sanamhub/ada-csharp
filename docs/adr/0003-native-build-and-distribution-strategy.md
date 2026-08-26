@@ -1,8 +1,8 @@
 # ADR-0003: Native build and distribution strategy
 
-- **Status:** proposed. Item 2 is blocked on the P1 measurement.
+- **Status:** accepted
 - **Date:** 2026-08-25
-- **Approved by:** Sanam (items 1, 3, 4, 5, 6)
+- **Approved by:** Sanam
 
 ## Context
 
@@ -16,11 +16,9 @@ advertises an older feature mask.
 
 1. **Pin upstream by release tag**, currently `v4.0.0`, never `main`. Moving the tag is a
    deliberate change gated by the conformance suite, not a Dependabot PR.
-2. **Ship an `x86-64-v2` baseline build with `ADA_USE_SIMDUTF=ON`.** simdutf picks AVX-512,
-   AVX2, or SSE kernels at runtime, so we get SIMD speed on whatever CPU is actually running
-   without setting a floor. `ADA_USE_SIMDUTF` is off by default upstream, so this item stays
-   proposed until the P1 measurement compares simdutf on, simdutf off, and an AVX2 pinned
-   reference build. No AVX2 pinned artifact ships either way.
+2. **Ship an `x86-64-v2` baseline build with `ADA_USE_SIMDUTF=OFF`.** No AVX2 pinned artifact
+   ships. The baseline keeps the CPU floor at 2009 hardware while Ada retains its own SIMD paths.
+   simdutf was tried and rejected, see below.
 3. **Six RIDs:** `win-x64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`, `osx-x64`,
    `osx-arm64`. `win-arm64` deferred. No 32 bit native.
 4. **Two macOS RIDs rather than a `lipo` universal binary.** The RID graph already picks the
@@ -30,10 +28,35 @@ advertises an older feature mask.
 6. **Natives are CI artifacts and are never committed.** Built only in CI from the pinned tag,
    with a SHA-256 manifest verified at pack time, code signing, macOS notarisation, and an SBOM.
 
+## Why simdutf is off
+
+The first attempt enabled `ADA_USE_SIMDUTF=ON`, on the reasoning that simdutf dispatches its
+kernel at runtime and would therefore give SIMD speed without a static CPU floor. The first CI
+run showed why that does not work here.
+
+Ada pulls simdutf through CPM, and `BUILD_SHARED_LIBS=ON` propagates into it. simdutf is then
+built as a **second shared library** rather than being linked in.
+
+On Windows that build fails outright. `cmake -E __create_def`, which generates `exports.def` from
+the object list, crashes with `0xC0000005` while processing the simdutf objects.
+
+On Linux and macOS it succeeds but produces `libsimdutf.so.25.0.0` next to `libada.so`, so
+`libada.so` gains a runtime dependency. Shipping it would mean a second binary per RID plus rpath
+handling, and the package layout in this ADR assumes one file per RID.
+
+Linking simdutf statically into a shared Ada is not reachable from the command line, because
+`BUILD_SHARED_LIBS` is a single global setting that both projects read.
+
+So the choice is one shared object per RID without simdutf, or two with it and no Windows
+support. The first is obviously better. Ada is SIMD accelerated in its own right, and simdutf
+only accelerates transcoding.
+
+Worth revisiting if upstream gains an option to link simdutf statically, or if measurement shows
+the transcoding path actually matters for our workload.
+
 ## Consequences
 
-The baseline build runs on any x86-64-v2 CPU, which means 2009 hardware onward, while still
-using AVX-512 where it exists.
+The baseline build runs on any x86-64-v2 CPU, which means 2009 hardware onward.
 
 Six RIDs cost six CI matrix legs and six ABI conformance lanes.
 
@@ -54,8 +77,11 @@ not to patch upstream.
 **AVX2 pinned as the default build.** Rejected. A hidden CPU floor and a hard crash, for a few
 percent.
 
-**A separate opt in AVX2 package.** Rejected. Runtime dispatch already gets the win, and a second
-package is a second thing to support.
+**`ADA_USE_SIMDUTF=ON`.** Tried and rejected. See the section above.
+
+**A separate opt in AVX2 package.** Rejected. A second package is a second thing to build, sign,
+version, and support, and its whole value is a few percent on a workload nobody has measured yet.
+Revisit only with numbers.
 
 **A `lipo` universal macOS dylib as the shipped asset.** Rejected. Doubles size for no gain.
 
