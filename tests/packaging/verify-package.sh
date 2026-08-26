@@ -26,7 +26,15 @@ PACKAGE_DIR="$(cd "$PACKAGE_DIR" && pwd)"
 VERSION="$(ls "$PACKAGE_DIR"/Ada.Url.*.nupkg | head -1 | sed 's/.*Ada\.Url\.\(.*\)\.nupkg/\1/')"
 [ -n "$VERSION" ] || { echo "no Ada.Url package found in $PACKAGE_DIR" >&2; exit 1; }
 
-echo "consuming Ada.Url $VERSION from $PACKAGE_DIR"
+# Under Git Bash, pwd returns an MSYS path like /d/a/repo/out, and .NET reads that as
+# C:\d\a\repo\out, which does not exist. Anything handed to a .NET tool or to Python needs the
+# native form, while the shell keeps using the MSYS one.
+NATIVE_PACKAGE_DIR="$PACKAGE_DIR"
+if command -v cygpath >/dev/null 2>&1; then
+  NATIVE_PACKAGE_DIR="$(cygpath -w "$PACKAGE_DIR")"
+fi
+
+echo "consuming Ada.Url $VERSION from $NATIVE_PACKAGE_DIR"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -44,7 +52,7 @@ cat > NuGet.Config <<XML
 <configuration>
   <packageSources>
     <clear />
-    <add key="local" value="$PACKAGE_DIR" />
+    <add key="local" value="$NATIVE_PACKAGE_DIR" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
   </packageSources>
   <packageSourceMapping>
@@ -135,7 +143,10 @@ fi
 # work out from a stack trace.
 if [ -n "$EXPECT_RID" ]; then
   echo "checking the package contains runtimes/$EXPECT_RID/native"
-  python3 - "$PACKAGE_DIR/Ada.Url.$VERSION.nupkg" "$EXPECT_RID" <<'PY'
+  # Windows runners expose python, not python3.
+  PY_BIN="python3"
+  command -v python3 >/dev/null 2>&1 || PY_BIN="python"
+  "$PY_BIN" - "$NATIVE_PACKAGE_DIR/Ada.Url.$VERSION.nupkg" "$EXPECT_RID" <<'PY'
 import sys, zipfile
 names = zipfile.ZipFile(sys.argv[1]).namelist()
 prefix = f"runtimes/{sys.argv[2]}/native/"
