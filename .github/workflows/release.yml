@@ -42,17 +42,16 @@ jobs:
           - { name: linux-arm64,    os: ubuntu-24.04-arm, rid: linux-arm64,    container: '' }
           - { name: win-x64,        os: windows-2022,     rid: win-x64,        container: '' }
           - { name: osx-arm64,      os: macos-14,         rid: osx-arm64,      container: '' }
-          # osx-x64 is deliberately absent. Running an x86_64 binary needs an Intel host, and
-          # macos-13 has queued for 20 to 40 minutes on every attempt, blocking everything
-          # behind it because `needs` is job level. A release that cannot start for 40 minutes
-          # is a release nobody cuts.
-          #
-          # What still covers that RID: the native build checks the architecture with lipo, so
-          # a silently arm64 binary cannot ship under it, and nightly.yml runs the full
-          # consumption test on macos-13 where a long queue costs nothing.
           # A glibc .so will not load on Alpine, so this leg is what proves the musl RID is real
           # rather than assumed. AC-2.5.
           - { name: linux-musl-x64, os: ubuntu-24.04,     rid: linux-musl-x64, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
+          #
+          # osx-x64 is deliberately absent. Running an x86_64 binary needs an Intel host, and
+          # macos-13 has queued 20 to 40 minutes on every attempt, blocking everything behind it
+          # because `needs` is job level. A release that cannot start for 40 minutes is a release
+          # nobody cuts. The native build still checks its architecture with lipo so an arm64
+          # binary cannot ship under that RID, and nightly.yml runs the full consumption test on
+          # macos-13 where a long queue costs nothing.
     steps:
       - uses: actions/checkout@v7
 
@@ -155,11 +154,25 @@ jobs:
       - name: pack
         run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out
 
+      # CycloneDX reads project.assets.json, so it sees NuGet packages and nothing else. The
+      # native library this package actually ships would be missing, which is the one dependency
+      # a consumer most needs listed: delivered as a binary they cannot inspect, and the one
+      # whose advisories would apply to them.
       - name: sbom
+        shell: pwsh
         run: |
           dotnet tool install -g CycloneDX
           dotnet CycloneDX src/Ada.Url/Ada.Url.csproj -o sbom
-        shell: pwsh
+          python scripts/add-native-to-sbom.py sbom/bom.xml native/CHECKSUMS.txt
+
+      - name: check the sbom lists the native
+        shell: bash
+        run: |
+          if ! grep -q 'pkg:github/ada-url/ada' sbom/bom.xml; then
+            echo "::error::SBOM does not list the native library"
+            exit 1
+          fi
+          echo "SBOM lists the native"
 
       # TODO: signing needs a certificate in the production environment. Until one exists this
       # step is skipped rather than faked, because an unsigned package that claims to be signed
