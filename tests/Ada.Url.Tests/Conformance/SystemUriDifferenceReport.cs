@@ -128,9 +128,16 @@ public class SystemUriDifferenceReport
 
         if (uriOnly > 0)
         {
-            sb.AppendLine("The third row is the one that matters for security. An input `System.Uri` accepts");
-            sb.AppendLine("and Ada rejects is an input the rest of the web would refuse. If code validates with");
-            sb.AppendLine("one parser and fetches with another, that gap is exploitable.");
+            // Name the row rather than number it. An earlier version said "the third row" while
+            // describing the fourth.
+            sb.AppendLine(CultureInfo.InvariantCulture, $"**Rejected by Ada, accepted by System.Uri** is the row that matters for security, and it");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"holds {uriOnly} of the {considered} cases. Each one is an input `System.Uri` accepts that");
+            sb.AppendLine("browsers, Node, Go and Python all refuse. Code that validates a URL with one parser and");
+            sb.AppendLine("then fetches it with another has an exploitable gap exactly there.");
+            sb.AppendLine();
+            sb.AppendLine(CultureInfo.InvariantCulture, $"The other direction, {adaOnly} inputs Ada accepts and `System.Uri` rejects, is a");
+            sb.AppendLine("compatibility question rather than a security one. Those are URLs the rest of the web");
+            sb.AppendLine("handles and .NET currently does not.");
             sb.AppendLine();
         }
 

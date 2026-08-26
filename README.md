@@ -23,11 +23,22 @@ Encoding.UTF8.GetString(url.Hostname);  // example.org
 WHATWG compliant, so it disagrees with browsers, and with the Node, Go and Python parsers, on a
 long list of real inputs. It also allocates on almost every operation.
 
-Where that matters most is security. An input `System.Uri` accepts and the rest of the web
-rejects is a gap, and code that validates a URL with one parser then fetches it with another is
-exploitable exactly there. Every disagreement is enumerated in
-[`docs/system-uri-differences.md`](docs/system-uri-differences.md), generated from the test
-corpus rather than written by hand.
+How far apart are they? Across 538 absolute URLs from the WHATWG test corpus, the two parsers
+produce a different outcome on **186 of them**:
+
+| | Count |
+| --- | ---: |
+| Same result | 352 |
+| Accepted by Ada, rejected by `System.Uri` | 64 |
+| **Rejected by Ada, accepted by `System.Uri`** | **32** |
+| Both parsed, different serialisation | 90 |
+
+The bolded row is the security one. Each of those 32 is an input `System.Uri` accepts that
+browsers, Node, Go and Python all refuse. Code that validates a URL with one parser and then
+fetches it with another has an exploitable gap exactly there.
+
+Every case is listed in [`docs/system-uri-differences.md`](docs/system-uri-differences.md),
+generated from the corpus rather than written by hand.
 
 ## Install
 
