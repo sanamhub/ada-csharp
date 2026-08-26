@@ -42,6 +42,9 @@ jobs:
           - { name: linux-arm64,    os: ubuntu-24.04-arm, rid: linux-arm64,    container: '' }
           - { name: win-x64,        os: windows-2022,     rid: win-x64,        container: '' }
           - { name: osx-arm64,      os: macos-14,         rid: osx-arm64,      container: '' }
+          # The osx-x64 native is cross compiled on Apple Silicon, but actually running an
+          # x86_64 binary needs an Intel host. macos-13 queues badly, which is why it was taken
+          # out of pull request CI. A release can afford to wait for it; a pull request cannot.
           - { name: osx-x64,        os: macos-13,         rid: osx-x64,        container: '' }
           # A glibc .so will not load on Alpine, so this leg is what proves the musl RID is real
           # rather than assumed. AC-2.5.

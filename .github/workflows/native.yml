@@ -22,7 +22,7 @@ on:
            {"rid":"linux-x64","os":"ubuntu-24.04"},
            {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
            {"rid":"linux-musl-x64","os":"ubuntu-24.04"},
-           {"rid":"osx-x64","os":"macos-13"},
+           {"rid":"osx-x64","os":"macos-14"},
            {"rid":"osx-arm64","os":"macos-14"}]
     secrets:
       MACOS_SIGNING_IDENTITY:
@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-13"},{"rid":"osx-arm64","os":"macos-14"}]') }}
+        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v7
@@ -93,6 +93,21 @@ jobs:
 
       # A library that builds but exports nothing is the silent failure of this workflow, so the
       # export check is a gate rather than a report.
+      # osx-x64 is cross compiled from Apple Silicon, so confirm the architecture rather than
+      # trust it. A silently arm64 binary shipped under the osx-x64 RID would fail on exactly
+      # the machines that RID exists for.
+      - name: verify the macos architecture
+        if: startsWith(matrix.rid, 'osx-')
+        shell: bash
+        run: |
+          lib="artifacts/native/${{ matrix.rid }}/libada.dylib"
+          info="$(lipo -info "$lib")"
+          echo "$info"
+          case "${{ matrix.rid }}" in
+            osx-x64)   echo "$info" | grep -q 'x86_64' || { echo "::error::not x86_64"; exit 1; } ;;
+            osx-arm64) echo "$info" | grep -q 'arm64'  || { echo "::error::not arm64";  exit 1; } ;;
+          esac
+
       - name: verify exports and hardening (unix)
         if: runner.os != 'Windows'
         shell: bash

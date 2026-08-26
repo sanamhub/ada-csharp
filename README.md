@@ -1,7 +1,9 @@
 # Ada.Url
 
-WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url/ada), the C++
-parser Node.js uses.
+WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url/ada).
+
+Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers, Telegram,
+Datadog, Kong and Redpanda. This package brings the same parser, and the same results, to .NET.
 
 Roughly twice as fast as `System.Uri` on a plain URL, and allocation free on the UTF-8 path.
 
