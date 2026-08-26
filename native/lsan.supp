@@ -1,0 +1,13 @@
+# LeakSanitizer suppressions.
+#
+# The .NET runtime allocates in ways LSAN reports as leaks but which we neither own nor control:
+# the JIT, the GC's own bookkeeping, and the host's startup allocations. Reporting those would
+# bury the leaks that are actually ours.
+#
+# Nothing here suppresses a frame from libada or from this library's interop. If a leak in either
+# is ever suppressed by one of these patterns, the pattern is wrong and should be narrowed.
+leak:libcoreclr.so
+leak:libclrjit.so
+leak:libSystem.Native.so
+leak:libhostfxr.so
+leak:libhostpolicy.so

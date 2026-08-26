@@ -6,7 +6,7 @@ parser. No implementation code ships with this document. Signatures, CMake calls
 
 | Field | Value |
 | --- | --- |
-| Status | Approved. P0 to P3 done. P4 next: benchmarks, packaging, release. |
+| Status | Approved. P0 to P4 done bar the first publish. |
 | Upstream | `ada-url/ada` v4.0.0, pinned by tag |
 | ABI reference | `include/ada_c.h` at v4.0.0, captured in section 3.1 |
 | Target framework | `net10.0` only. No conditional compilation. See ADR-0001. |
@@ -67,7 +67,7 @@ Cut after a minimality review. Each was defensible. None was worth its cost.
 | Architecture test enforcing layer direction | There are two layers. A test to prove it is theatre. |
 | Custom Roslyn analyzer for a missing `using` | An analyzer project plus a test project to catch one mistake. Handled instead by making the handle free API the primary surface, so most callers never own a handle. |
 | Span wrapper with a generation counter | It would appear in the signature of every getter, taxing the path that has to stay free. Replaced by contract, tests, and ASAN. |
-| Always on `EventCounter` handle tracking | This was a real defect in the first draft. An `Interlocked.Increment` per parse is measurable against a 50 ns operation. Now `ADA_DIAGNOSTICS` builds only. |
+| `EventCounter` handle tracking, in any form | An `Interlocked.Increment` per parse is measurable against a 50 ns operation, so it could not be always on. Behind a conditional it would have been the first `#if` in a repository whose ADR-0001 forbids them. Dropped entirely: ASAN covers more, since it also sees allocations this library never touches. |
 | A separate AVX2 pinned package | A hidden CPU floor for a few percent on a workload nobody has measured. A second package is also a second thing to build, sign, version, and support. |
 | Per RID runtime packages via `runtime.json` | One package. Revisit if the native grows. |
 | Nightly fuzzing lane | Upstream fuzzes the native side. Our surface is transcode and length arithmetic, covered by property based tests in the normal suite. |
@@ -803,15 +803,14 @@ Warm up before taking the baseline, or the pool's first allocation lands in the 
 independent, so a leak found on Linux is a leak everywhere. That is why the first draft's
 valgrind, Application Verifier, macOS `leaks`, and RSS slope lanes were cut.
 
-**Handle counters, `ADA_DIAGNOSTICS` builds only.**
+**Handle counters: specified here, then dropped.** They were to sit behind an
+`ADA_DIAGNOSTICS` conditional. ADR-0001 forbids conditional compilation and CI enforces it with a
+grep, so shipping them would have put the first `#if` in the repository. The rule is worth more
+than the counters.
 
-```csharp
-AdaDiagnostics.LiveUrlHandles / LiveOwnedStrings / LiveSearchParams / LiveIterators
-```
-
-Every test class asserts the counters return to their entry values in teardown, which catches a
-leaked handle in the fast suite minutes after the commit. The diagnostics build runs in CI
-alongside Release.
+ASAN is the stronger check anyway. It sees native allocations this library never touches,
+including anything Ada itself fails to free, which a managed counter cannot. The soak suite gives
+it the repetitions to work with.
 
 **Soak.** One million mixed corpus iterations across parse, mutate, read, search params, IDNA, and
 copy, asserting no handle imbalance and no exceptions. Nightly, excluded from PR CI by trait so PR
@@ -1048,8 +1047,7 @@ jobs:
 ### 6.2 `ci.yml`, the PR gate
 
 Jobs: `natives` (calls the reusable workflow), `build-test` (matrix over win-x64, linux-x64,
-linux-arm64, osx-arm64, running build, test with coverage, the ABI leg, the `ADA_DIAGNOSTICS`
-leg, and the no `#if` grep), `packaging` (pack, Alpine container test, NativeAOT consumption
+linux-arm64, osx-arm64, running build, test with coverage, the ABI leg, and the no `#if` grep), `packaging` (pack, Alpine container test, NativeAOT consumption
 test), `analyze` (CodeQL), and `deps` (dependency review at `fail-on-severity: high`, per org
 standard).
 
@@ -1067,7 +1065,8 @@ Three jobs on a 03:00 cron.
 `asan` rebuilds the native with `-fsanitize=address,undefined` and runs the conformance suite
 under `LSAN_OPTIONS=detect_leaks=1`. This is the primary native leak gate, AC-4.4.
 
-`soak` runs the stress trait with `ADA_DIAGNOSTICS` for AC-4.5.
+`soak` runs the stress trait for AC-4.5, giving the sanitizer job's findings enough repetitions
+to surface.
 
 `bench` runs BenchmarkDotNet with the JSON exporter and compares to the stored baseline at a 15%
 tolerance. It opens an issue, it never fails the build. Move it to a pinned self hosted runner for
@@ -1141,7 +1140,7 @@ ada-csharp/
 | --- | --- | :-: | :-: | --- |
 | R-1 | Struct return by value mishandled on one platform | Critical, silent corruption | Low | ABI suite per RID. Nothing ships without it green. |
 | R-2 | Borrowed pointer used after mutation | Critical, use after free | Medium | Contract, handle free primary API, category 15, ASAN. **Open, not mitigated.** Enforcement was traded for zero overhead, see ADR-0004. |
-| R-3 | Handle or owned string leaked | High | Medium | `AdaOwnedString`, the `Try...(Span)` API shape, `ADA_DIAGNOSTICS` counters, ASAN |
+| R-3 | Handle or owned string leaked | High | Medium | `AdaOwnedString`, the `Try...(Span)` API shape, the soak suite, ASAN and LSAN nightly |
 | R-4 | Native fails to resolve in a single file bundle, container, or AOT publish | High | Medium | `DllImportResolver`, Alpine and NativeAOT consumption tests |
 | R-5 | `-fvisibility=hidden` hides the whole `ada_*` surface | High, ships nothing | Medium | Export gate in CI. Drop the flag rather than patch upstream. |
 | R-6 | Upstream Ada v5 breaks the C ABI | Medium | Medium | Pin by tag, ADR-0003 upgrade policy, conformance suite as the gate |
@@ -1156,7 +1155,7 @@ ada-csharp/
 | **P1** done | `native.yml` producing all six RIDs from v4.0.0, export, hardening, and checksum gates. The simdutf measurement feeding ADR-0003 is still outstanding. | AC-2.1 to AC-2.4, AC-2.6 |
 | **P2** done | Full `AdaNative` surface, blittable structs, ABI suite, handle free statics, `AdaUrl` ref struct | AC-1.3, AC-3.1 to AC-3.5, AC-4.6 |
 | **P3** done | WPT corpus adapter, categories 1 to 21, `SafeHandle`, `AdaSearchParams`, `AdaIdna`, parity tests, ASAN and soak lanes | AC-1.2, AC-4.1 to AC-4.5, AC-4.7, AC-4.8 |
-| **P4** next | Benchmarks W1 to W4 in three tiers, packaging, Alpine and NativeAOT tests, signing, SBOM, runbook, `release.yml` | AC-1.1, AC-1.4, AC-1.5, AC-2.5, AC-2.7, AC-5.1 to AC-5.8 |
+| **P4** done bar publishing | Benchmarks, packaging with a completeness gate, clean project consumption on six platforms including Alpine and NativeAOT, SBOM, runbook, `release.yml` with trusted publishing | AC-1.1, AC-1.4, AC-1.5, AC-2.5, AC-2.7, AC-5.1 to AC-5.8 |
 
 One target framework is what makes this five phases instead of eight. No fallback lane to build,
 no second interop path to keep behaviourally identical, no `#if` to audit.

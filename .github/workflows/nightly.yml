@@ -1,0 +1,121 @@
+name: nightly
+
+# The slow checks. None of these gate a pull request, because a job that takes twenty minutes or
+# reports a statistical result gets ignored or disabled when it sits in the merge path.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  asan:
+    name: sanitizers
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: install build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang lld llvm cmake
+
+      # A separate build of the native library with the sanitizers on. This is the primary
+      # native leak gate. Our own code is platform independent, so a leak found here is a leak
+      # everywhere, which is why there is no matching Windows or macOS lane.
+      - name: build the native with address and undefined sanitizers
+        run: ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 --sanitize address,undefined
+
+      - name: run the conformance suite under the sanitizers
+        env:
+          LSAN_OPTIONS: detect_leaks=1
+          ASAN_OPTIONS: detect_stack_use_after_return=1:abort_on_error=1:print_stats=1
+          # The .NET runtime allocates in ways LSAN reports but we do not own. Only frames from
+          # the native library and this library's interop are actionable.
+          LSAN_SUPPRESSIONS: ${{ github.workspace }}/native/lsan.supp
+        run: dotnet test -c Release --filter "Category=Conformance"
+
+  soak:
+    name: soak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: artifacts/native/linux-x64
+          key: native-v4.0.0-linux-x64-${{ hashFiles('native/**') }}
+      - name: build the native
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build clang lld llvm cmake
+          ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64
+
+      # The plan originally paired this with ADA_DIAGNOSTICS handle counters. Those need an #if,
+      # which ADR-0001 forbids and CI enforces, so they were dropped rather than granted an
+      # exception. The asan job above is the stronger leak check anyway: it sees native
+      # allocations this library never touches.
+      - name: soak
+        run: dotnet test -c Release --filter "Category=Stress"
+
+  bench:
+    name: benchmarks
+    uses: ./.github/workflows/bench.yml
+
+  wpt-drift:
+    name: corpus drift
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The corpus is pinned so a test never depends on the network and a silent upstream change
+      # cannot turn a regression into a mystery. This job is how we still find out it moved.
+      - name: compare the vendored corpus against upstream
+        id: drift
+        run: |
+          pinned="$(grep -oE '[0-9a-f]{40}' tests/Ada.Url.Tests/vectors/PROVENANCE.md | head -1)"
+          latest="$(curl -sS 'https://api.github.com/repos/web-platform-tests/wpt/commits?path=url/resources&per_page=1' | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["sha"])')"
+          echo "pinned=$pinned" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          if [ "$pinned" = "$latest" ]; then
+            echo "corpus is current at $pinned"
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "corpus has moved: pinned $pinned, upstream $latest"
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: open an issue when the corpus has moved
+        if: steps.drift.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PINNED: ${{ steps.drift.outputs.pinned }}
+          LATEST: ${{ steps.drift.outputs.latest }}
+        run: |
+          existing="$(gh issue list --label corpus-drift --state open --json number --jq '.[0].number')"
+          if [ -n "$existing" ]; then
+            echo "issue #$existing is already open"
+            exit 0
+          fi
+          gh issue create \
+            --title "WHATWG corpus has moved upstream" \
+            --label corpus-drift \
+            --body "$(printf 'The vendored web-platform-tests URL corpus is pinned at `%s`.\nUpstream `url/resources` is now at `%s`.\n\nRefresh it deliberately: re-fetch at the new commit, update PROVENANCE.md, and review whatever the conformance suite then reports. A change here is a specification change, so the diff is worth reading rather than merging.\n\nCompare: https://github.com/web-platform-tests/wpt/compare/%s...%s' "$PINNED" "$LATEST" "$PINNED" "$LATEST")"
