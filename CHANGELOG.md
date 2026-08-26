@@ -3,7 +3,12 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0-beta.1]
+
+First published release. Beta rather than alpha because the WHATWG conformance suite passes in
+full on four platforms and the package is verified by installing it into a clean project, but
+the public API has had no outside use yet and may still move.
+
 
 ### Added
 

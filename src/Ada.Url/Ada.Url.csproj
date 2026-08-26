@@ -13,7 +13,7 @@
   <PropertyGroup Label="Package">
     <IsPackable>true</IsPackable>
     <PackageId>Ada.Url</PackageId>
-    <Version>0.1.0-alpha.1</Version>
+    <Version>0.1.0-beta.1</Version>
     <Description>Zero-allocation .NET wrapper around the Ada WHATWG-compliant URL parser.</Description>
     <PackageTags>url;uri;whatwg;parser;ada;idna;performance</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
