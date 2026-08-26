@@ -1,0 +1,66 @@
+name: verify published
+
+# Installs the package from nuget.org on every platform it claims to support, after it is public.
+#
+# The release workflow already does this once, but inside the publish job, which runs on Windows
+# because code signing needs signtool. One platform is thin cover for a library whose whole
+# problem is shipping six native binaries, and win-x64 is the least likely of them to fail.
+#
+# This is deliberately not part of release.yml. A tag triggered run reads its workflow from the
+# tag, so a check added after a tag is cut cannot run for it. The release event reads from the
+# default branch instead, so this covers the release being published right now.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version to verify, without the leading v'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  verify:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64,      os: ubuntu-24.04,     container: '' }
+          - { name: linux-arm64,    os: ubuntu-24.04-arm, container: '' }
+          - { name: osx-arm64,      os: macos-14,         container: '' }
+          - { name: win-x64,        os: windows-2022,     container: '' }
+          - { name: linux-musl-x64, os: ubuntu-24.04,     container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
+          # osx-x64 needs an Intel host, and macos-13 queues for tens of minutes. nightly.yml
+          # covers it, where waiting costs nothing.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: alpine prerequisites
+        if: matrix.container != ''
+        shell: sh
+        run: apk add --no-cache bash curl
+
+      - uses: actions/setup-dotnet@v6
+        if: matrix.container == ''
+        with:
+          global-json-file: global.json
+
+      - name: verify the published package
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version || github.event.release.tag_name }}"
+          version="${version#v}"
+          echo "verifying Ada.Url $version from nuget.org"
+          ./tests/packaging/verify-published.sh --version "$version"

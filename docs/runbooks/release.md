@@ -56,14 +56,11 @@ bad version.
 
 ## After releasing
 
-The workflow already reinstalls the package from nuget.org and creates the release, so what is
-left is short.
-
 1. Read the release page. Confirm the notes match the changelog and that the nupkg, snupkg and
    SBOM are attached.
-2. Run `tests/packaging/verify-published.sh --version <version>` on a second operating system.
-   The workflow runs it on Windows only, and this is the one test that uses what nuget.org
-   actually served rather than a local artifact.
+2. Watch `verify published`. Publishing the release triggers it, and it installs the package from
+   nuget.org on Linux x64, Linux arm64, Alpine, macOS arm64 and Windows. `publish` already ran
+   the same check once, but on Windows only, because that job runs on Windows for code signing.
 3. Open the next `Unreleased` section in `CHANGELOG.md` and bump `<Version>` for the next cycle.
    This is the one manual changelog step; nothing writes it for you.
 
