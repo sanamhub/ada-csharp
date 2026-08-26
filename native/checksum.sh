@@ -16,6 +16,11 @@ find "$DIR" -maxdepth 1 -type f \
      -print0 \
   | sort -z \
   | while IFS= read -r -d '' file; do
-      sum="$(sha256sum "$file" | cut -d' ' -f1)"
+      # macOS ships shasum rather than sha256sum.
+      if command -v sha256sum >/dev/null 2>&1; then
+        sum="$(sha256sum "$file" | cut -d' ' -f1)"
+      else
+        sum="$(shasum -a 256 "$file" | cut -d' ' -f1)"
+      fi
       echo "$sum  $RID/$(basename "$file")"
     done

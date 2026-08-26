@@ -25,9 +25,17 @@ done
 [ -n "$ADA_TAG" ] || { echo "--ada-tag is required" >&2; exit 2; }
 [ -n "$RID" ]     || { echo "--rid is required" >&2; exit 2; }
 
+# Control flow protection is spelled differently per architecture. -fcf-protection is Intel CET
+# and is x86 only: clang rejects it outright on aarch64 rather than ignoring it.
 case "$RID" in
-  linux-x64|linux-musl-x64) ARCH_FLAGS="-march=x86-64-v2 -mtune=generic" ;;
-  linux-arm64)              ARCH_FLAGS="-march=armv8-a+crc+crypto -mtune=neoverse-n1" ;;
+  linux-x64|linux-musl-x64)
+    ARCH_FLAGS="-march=x86-64-v2 -mtune=generic"
+    CFI_FLAGS="-fcf-protection=full"
+    ;;
+  linux-arm64)
+    ARCH_FLAGS="-march=armv8-a+crc+crypto -mtune=neoverse-n1"
+    CFI_FLAGS="-mbranch-protection=standard"
+    ;;
   *) echo "unsupported rid for this script: $RID" >&2; exit 2 ;;
 esac
 
@@ -46,7 +54,7 @@ CXX_FLAGS="-O3 -DNDEBUG $ARCH_FLAGS -flto=thin -fno-plt -fno-semantic-interposit
 # The first attempt produced a 14 KB libada.so that exported not one symbol. Do not add it back
 # without also patching upstream, which is not our call to make.
 CXX_FLAGS="$CXX_FLAGS -ffunction-sections -fdata-sections"
-CXX_FLAGS="$CXX_FLAGS -fstack-protector-strong -fcf-protection=full"
+CXX_FLAGS="$CXX_FLAGS -fstack-protector-strong $CFI_FLAGS"
 LINK_FLAGS="-flto=thin -Wl,--gc-sections -Wl,-O2 -Wl,--as-needed"
 LINK_FLAGS="$LINK_FLAGS -Wl,-z,relro,-z,now -Wl,-z,noexecstack"
 
