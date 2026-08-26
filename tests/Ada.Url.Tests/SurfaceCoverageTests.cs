@@ -128,10 +128,12 @@ public class SurfaceCoverageTests
     }
 
     [Fact]
-    public void Components_OffsetsSliceTheHrefCorrectly()
+    public void Components_HostStartPointsAtTheAtSignWhenCredentialsArePresent()
     {
-        // The offsets are only useful if they actually index the href. Slicing with them and
-        // comparing against the getters is the check that they line up.
+        // This is the trap the component offsets carry, and the reason the slicing fast path was
+        // never built. With credentials in the URL, host_start indexes the '@' rather than the
+        // first character of the host, so slicing [HostStart..HostEnd] yields "@example.com".
+        // Upstream's own diagram in url_components.h shows the marker under the '@'.
         const string Input = "https://user:pw@example.com:8443/a/b?q=1#f";
         Assert.True(AdaUrl.TryParse(Encoding.UTF8.GetBytes(Input), out AdaUrl url));
 
@@ -146,8 +148,31 @@ public class SurfaceCoverageTests
             Assert.True(AdaUrlComponents.IsPresent(c.HostEnd));
 
             Assert.Equal("https:", Encoding.UTF8.GetString(href[..(int)c.ProtocolEnd]));
-            Assert.Equal("example.com", Encoding.UTF8.GetString(href[(int)c.HostStart..(int)c.HostEnd]));
+
+            // Documented as it actually behaves, not as it reads.
+            Assert.Equal("@example.com", Encoding.UTF8.GetString(href[(int)c.HostStart..(int)c.HostEnd]));
+
+            // Which is why a caller has to skip it, and why Hostname is the safe way to ask.
+            Assert.Equal("example.com", Encoding.UTF8.GetString(href[((int)c.HostStart + 1)..(int)c.HostEnd]));
+            Assert.Equal("example.com", Encoding.UTF8.GetString(url.Hostname));
+
             Assert.Equal(8443u, c.Port);
+        }
+    }
+
+    [Fact]
+    public void Components_HostStartPointsAtTheHostWhenThereAreNoCredentials()
+    {
+        // Without credentials there is no '@', so the same slice is correct. Two different
+        // behaviours from one field is exactly what makes it worth pinning.
+        Assert.True(AdaUrl.TryParse("https://example.com:8443/a"u8, out AdaUrl url));
+
+        using (url)
+        {
+            AdaUrlComponents c = url.Components;
+            ReadOnlySpan<byte> href = url.Href;
+
+            Assert.Equal("example.com", Encoding.UTF8.GetString(href[(int)c.HostStart..(int)c.HostEnd]));
         }
     }
 
@@ -166,12 +191,19 @@ public class SurfaceCoverageTests
             AdaUrlComponents b = second.Components;
             AdaUrlComponents c = third.Components;
 
-            Assert.True(a == b);
+            // Report the fields on failure. "Expected True, Actual False" on a struct comparison
+            // says nothing about which field differed.
+            string describe(AdaUrlComponents x) =>
+                $"protocolEnd={x.ProtocolEnd} usernameEnd={x.UsernameEnd} hostStart={x.HostStart} " +
+                $"hostEnd={x.HostEnd} port={x.Port} pathnameStart={x.PathnameStart} " +
+                $"searchStart={x.SearchStart} hashStart={x.HashStart}";
+
+            Assert.True(a == b, $"identical URLs gave different components. a: {describe(a)} | b: {describe(b)}");
             Assert.False(a != b);
             Assert.True(a.Equals(b));
             Assert.Equal(a.GetHashCode(), b.GetHashCode());
 
-            Assert.True(a != c);
+            Assert.True(a != c, $"different URLs gave equal components. a: {describe(a)} | c: {describe(c)}");
         }
     }
 
