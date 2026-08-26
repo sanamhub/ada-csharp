@@ -59,7 +59,7 @@ jobs:
         id: cache
         with:
           path: artifacts/native/linux-x64
-          key: native-v4.0.0-linux-x64-${{ hashFiles('native/**') }}
+          key: native-v4.0.0-linux-x64-${{ hashFiles('native/build-linux.sh', 'native/build-macos.sh', 'native/build-musl.sh', 'native/build-windows.ps1') }}
       - name: build the native
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -95,7 +95,7 @@ jobs:
         id: cache
         with:
           path: artifacts/native/osx-x64
-          key: native-v4.0.0-osx-x64-${{ hashFiles('native/**') }}
+          key: native-v4.0.0-osx-x64-${{ hashFiles('native/build-linux.sh', 'native/build-macos.sh', 'native/build-musl.sh', 'native/build-windows.ps1') }}
       - name: build the native
         if: steps.cache.outputs.cache-hit != 'true'
         run: |

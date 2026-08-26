@@ -1,0 +1,80 @@
+name: reproducible build
+
+# Builds a native library twice, from scratch, in one job, and requires the two to be identical.
+#
+# native/CHECKSUMS.txt is a supply chain control: a committed hash for every shipped binary, which
+# the release verifies before it publishes. That control is worth nothing unless a build can be
+# reproduced, because a hash that changes on every rebuild cannot tell a rebuild apart from a
+# substitution. Anyone hitting the mismatch just regenerates the manifest, which is precisely what
+# an attacker would want them to do.
+#
+# Windows was not reproducible: MSVC stamps the PE header with the build time and the debug
+# directory with a fresh PDB signature. /Brepro and /PDBALTPATH fix that, and this is what checks
+# the fix still holds. linux-x64 is included as a control.
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  twice:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,   os: windows-2022, lib: ada.dll   }
+          - { rid: linux-x64, os: ubuntu-24.04, lib: libada.so }
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: install build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang lld llvm cmake
+
+      # No cache on purpose. A cache hit would compare a binary against itself.
+      - name: first build
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.rid }}" in
+            win-x64)   pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid win-x64 ;;
+            linux-x64) ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 ;;
+          esac
+          mkdir -p /tmp/repro
+          cp "artifacts/native/${{ matrix.rid }}/${{ matrix.lib }}" /tmp/repro/first
+
+      - name: second build, from scratch
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Remove everything the first build produced, including the checked out Ada source, so
+          # the second build repeats the clone as well as the compile.
+          rm -rf native/build native/ada-src artifacts/native
+          case "${{ matrix.rid }}" in
+            win-x64)   pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid win-x64 ;;
+            linux-x64) ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 ;;
+          esac
+          cp "artifacts/native/${{ matrix.rid }}/${{ matrix.lib }}" /tmp/repro/second
+
+      - name: the two builds must be identical
+        shell: bash
+        run: |
+          set -euo pipefail
+          a="$(sha256sum /tmp/repro/first  | cut -d' ' -f1)"
+          b="$(sha256sum /tmp/repro/second | cut -d' ' -f1)"
+          echo "first:  $a"
+          echo "second: $b"
+          if [ "$a" != "$b" ]; then
+            echo "::error::${{ matrix.rid }} is not reproducible. native/CHECKSUMS.txt cannot gate a binary that changes on every build."
+            cmp -l /tmp/repro/first /tmp/repro/second | head -40 || true
+            echo "differing bytes: $(cmp -l /tmp/repro/first /tmp/repro/second | wc -l)"
+            exit 1
+          fi
+          echo "${{ matrix.rid }} reproduces byte for byte"
+          echo "sha256 for native/CHECKSUMS.txt: $a  ${{ matrix.rid }}/${{ matrix.lib }}" >> "$GITHUB_STEP_SUMMARY"

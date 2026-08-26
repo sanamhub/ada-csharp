@@ -51,10 +51,19 @@ jobs:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v7
 
+      # Keyed on the build scripts, not on all of native/.
+      #
+      # native/** included CHECKSUMS.txt, which is the manifest the release verifies against.
+      # Committing an updated manifest changed the key, which forced a rebuild, which produced a
+      # different binary, which made the manifest stale the moment it landed. The check could
+      # never converge because its own input was part of the key.
+      #
+      # The verify scripts are excluded for the same reason: they inspect the binary, they do not
+      # produce it, and a fix to one of them should not throw away six caches.
       - name: compute cache key
         id: key
         shell: bash
-        run: echo "k=native-${ADA_TAG}-${{ matrix.rid }}-${{ hashFiles('native/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "k=native-${ADA_TAG}-${{ matrix.rid }}-${{ hashFiles('native/build-linux.sh', 'native/build-macos.sh', 'native/build-musl.sh', 'native/build-windows.ps1') }}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache@v4
         id: cache

@@ -43,8 +43,19 @@ if (-not (Test-Path (Join-Path $src '.git'))) {
 # /OPT:ICF still run at link time, so this is not the whole of LTO gone.
 #
 # /guard:cf, /DYNAMICBASE, /HIGHENTROPYVA and /CETCOMPAT are required hardening.
-$cxxFlags  = '/O2 /Ob3 /Oi /Gy /Gw /EHsc /DNDEBUG /Zi /guard:cf'
-$linkFlags = '/OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /GUARD:CF /DYNAMICBASE /HIGHENTROPYVA /CETCOMPAT'
+#
+# /Brepro is what makes the checksum manifest mean anything. By default MSVC stamps the PE header
+# with the build time and the debug directory with a fresh PDB signature, so two builds of
+# identical source produce different bytes. That was not theoretical: 3971fb8a and 69163c67 are
+# the same commit built twice. With no way to reproduce a binary, a committed hash cannot tell a
+# rebuild apart from a substitution, which is the only thing it exists to detect.
+#
+# /PDBALTPATH:%_PDB% stores the PDB file name rather than its full path in the debug directory,
+# so the binary does not depend on where the build happened.
+#
+# The five Unix RIDs already reproduce byte for byte with no extra flags.
+$cxxFlags  = '/O2 /Ob3 /Oi /Gy /Gw /EHsc /DNDEBUG /Zi /guard:cf /Brepro'
+$linkFlags = '/OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /GUARD:CF /DYNAMICBASE /HIGHENTROPYVA /CETCOMPAT /Brepro /PDBALTPATH:%_PDB%'
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 
