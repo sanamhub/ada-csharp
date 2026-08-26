@@ -32,15 +32,29 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 cd "$WORK"
 
-# A local-only feed. If the package somehow resolved from nuget.org instead of the one just
-# built, this test would be checking the wrong artifact entirely.
+# Ada.Url must come from the local build, or this test checks the wrong artifact. A local-only
+# feed enforces that, but it also starves NativeAOT, which pulls the ILCompiler packages from
+# nuget.org and fails with NU1101 when nothing else is configured.
+#
+# Package source mapping gives both: Ada.Url can only resolve from local, everything else only
+# from nuget.org. Narrower than a local-only feed rather than looser, because it also pins where
+# every other dependency is allowed to come from.
 cat > NuGet.Config <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear />
     <add key="local" value="$PACKAGE_DIR" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
   </packageSources>
+  <packageSourceMapping>
+    <packageSource key="local">
+      <package pattern="Ada.Url" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
 </configuration>
 XML
 
