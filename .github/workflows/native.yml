@@ -11,6 +11,19 @@ on:
       ada-tag:
         type: string
         default: v4.0.0
+      rids:
+        description: >
+          JSON array of matrix entries to build. Callers that only need a few RIDs should say
+          so. macos-13 in particular can sit queued for tens of minutes, and because `needs` is
+          job level, one stuck leg blocks every job downstream of this workflow.
+        type: string
+        default: >-
+          [{"rid":"win-x64","os":"windows-2022"},
+           {"rid":"linux-x64","os":"ubuntu-24.04"},
+           {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
+           {"rid":"linux-musl-x64","os":"ubuntu-24.04"},
+           {"rid":"osx-x64","os":"macos-13"},
+           {"rid":"osx-arm64","os":"macos-14"}]
     secrets:
       MACOS_SIGNING_IDENTITY:
         required: false
@@ -33,13 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { rid: win-x64,        os: windows-2022     }
-          - { rid: linux-x64,      os: ubuntu-24.04     }
-          - { rid: linux-arm64,    os: ubuntu-24.04-arm }
-          - { rid: linux-musl-x64, os: ubuntu-24.04     }
-          - { rid: osx-x64,        os: macos-13         }
-          - { rid: osx-arm64,      os: macos-14         }
+        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-13"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v4

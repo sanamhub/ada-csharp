@@ -21,7 +21,17 @@ env:
 
 jobs:
   natives:
+    # Only the RIDs build-test actually runs on. macos-13 can sit queued for tens of minutes,
+    # and because `needs` is job level one stuck matrix leg blocks the whole run. osx-x64 and
+    # linux-musl-x64 are built by the release workflow and by the packaging job, neither of
+    # which gates a pull request.
     uses: ./.github/workflows/native.yml
+    with:
+      rids: >-
+        [{"rid":"win-x64","os":"windows-2022"},
+         {"rid":"linux-x64","os":"ubuntu-24.04"},
+         {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
+         {"rid":"osx-arm64","os":"macos-14"}]
 
   build-test:
     name: build+test (${{ matrix.rid }})

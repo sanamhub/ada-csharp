@@ -21,6 +21,13 @@ advertises an older feature mask.
    simdutf was tried and rejected, see below.
 3. **Six RIDs:** `win-x64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`, `osx-x64`,
    `osx-arm64`. `win-arm64` deferred. No 32 bit native.
+
+   Which of them get built is per workflow rather than fixed. A pull request builds only the
+   four its test matrix runs on, the benchmark builds one, and the release builds all six.
+   `osx-x64` needs `macos-13`, a retiring Intel image whose queue ran to 37 minutes in practice
+   while every other leg finished in under three. Because `needs` is job level in GitHub
+   Actions, one queued matrix leg blocks every downstream job, so a pull request that does not
+   need that RID must not wait on it.
 4. **Two macOS RIDs rather than a `lipo` universal binary.** The RID graph already picks the
    right asset, and a universal binary doubles the size of every deployment for nothing. The
    `lipo` recipe stays in the build script for single file bundle consumers.

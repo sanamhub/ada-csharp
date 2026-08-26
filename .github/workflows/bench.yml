@@ -32,7 +32,11 @@ env:
 
 jobs:
   natives:
+    # The benchmark runs on linux-x64, so there is no reason to build five other RIDs and wait
+    # on the slowest runner in the pool.
     uses: ./.github/workflows/native.yml
+    with:
+      rids: '[{"rid":"linux-x64","os":"ubuntu-24.04"}]'
 
   run:
     needs: natives
