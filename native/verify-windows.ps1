@@ -44,8 +44,21 @@ if (-not $dumpbin) { throw 'dumpbin.exe not found. Install the MSVC toolset or r
 $exports = & $dumpbin /nologo /exports $dll
 if ($LASTEXITCODE -ne 0) { throw "dumpbin failed with exit code $LASTEXITCODE" }
 
-$missing = $required | Where-Object { $exports -notmatch "\b$_\b" }
-if ($missing) {
+# -match and -notmatch against an ARRAY return the matching or non-matching elements, not a
+# boolean. "$exports -notmatch $sym" is therefore a non-empty array, which is truthy, for every
+# symbol, so this reported everything missing from a DLL that exported all of it. Select-String
+# -Quiet returns an actual boolean.
+$missing = @()
+foreach ($sym in $required) {
+    if (-not ($exports | Select-String -SimpleMatch $sym -Quiet)) {
+        $missing += $sym
+    }
+}
+
+if ($missing.Count -gt 0) {
+    Write-Output 'ada_* symbols dumpbin actually reported:'
+    $found = $exports | Select-String -Pattern 'ada_\w+' | Select-Object -First 20
+    if ($found) { $found | ForEach-Object { "  $_" } } else { '  (none at all)' }
     Write-Error "FAIL: missing exported symbols: $($missing -join ', ')"
     exit 1
 }
