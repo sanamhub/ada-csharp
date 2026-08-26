@@ -1,5 +1,10 @@
 # Ada.Url
 
+[![NuGet](https://img.shields.io/nuget/v/Ada.Url?logo=nuget)](https://www.nuget.org/packages/Ada.Url)
+[![Downloads](https://img.shields.io/nuget/dt/Ada.Url?logo=nuget)](https://www.nuget.org/packages/Ada.Url)
+[![CI](https://github.com/sanamhub/ada-csharp/actions/workflows/ci.yml/badge.svg)](https://github.com/sanamhub/ada-csharp/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url/ada).
 
 Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers, Telegram,
