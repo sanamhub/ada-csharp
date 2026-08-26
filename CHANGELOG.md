@@ -13,8 +13,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   management, analyzer and lint gates, `ci.yml`, and ADR-0001 through ADR-0005.
 - Native build for all six RIDs: build scripts for Windows, Linux, Alpine, and macOS, plus
   `native.yml` with export, hardening, and checksum gates.
+- Interop layer: the full `ada_c.h` surface bound with `LibraryImport`, blittable ABI structs,
+  a native resolver for single file and development layouts, and allocation free UTF-16
+  transcoding.
+- Public API: `AdaUrl` for multi property work, one shot statics for validation and
+  normalisation, `AdaUrlComponents`, and `AdaLibrary`.
+- Tests: ABI conformance, parsing behaviour, and allocation assertions.
 
 ### Notes
 
-- No functional API yet. `AdaUrlInfo.UpstreamAdaVersion` is a placeholder. The URL API lands in
-  P2 and P3 of the roadmap.
+- Search params and IDNA are bound at the interop layer but not yet wrapped. They arrive in P3
+  along with the WHATWG conformance corpus.

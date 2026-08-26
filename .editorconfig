@@ -52,3 +52,19 @@ dotnet_diagnostic.CA1515.severity = none    # test classes must be public for th
 dotnet_diagnostic.CS1591.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1515.severity = none
+
+[src/**.cs]
+# The C ABI returns uint8_t for these, so byte is the correct underlying type. Widening to int
+# would misrepresent the native contract.
+dotnet_diagnostic.CA1028.severity = none
+
+# CA5393 objects to AssemblyDirectory because it is not a fixed OS directory. For a library that
+# ships its own native binary that is exactly where the binary lives, and the assembly level
+# DefaultDllImportSearchPaths is still narrower than the default probing order, which includes
+# the current working directory. Removing the attribute would be less safe, not more.
+dotnet_diagnostic.CA5393.severity = none
+
+# CA2000 cannot follow a ref struct handed back through an out parameter. Every site it flags
+# already disposes with a using statement on the success path, and on the failure path the value
+# is default and owns nothing.
+dotnet_diagnostic.CA2000.severity = none

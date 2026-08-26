@@ -6,7 +6,7 @@ parser. No implementation code ships with this document. Signatures, CMake calls
 
 | Field | Value |
 | --- | --- |
-| Status | Approved. P0 and P1 done, P2 next. |
+| Status | Approved. P0, P1, and P2 done. P3 next. |
 | Upstream | `ada-url/ada` v4.0.0, pinned by tag |
 | ABI reference | `include/ada_c.h` at v4.0.0, captured in section 3.1 |
 | Target framework | `net10.0` only. No conditional compilation. See ADR-0001. |
@@ -1145,8 +1145,8 @@ ada-csharp/
 | --- | --- | --- |
 | **P0** done | git init, repo skeleton, build props, editorconfig, `ci.yml`, README, ADR-0001 to ADR-0005 | CI green on the scaffold, lint gate live, ADR-0005 approved |
 | **P1** done | `native.yml` producing all six RIDs from v4.0.0, export, hardening, and checksum gates. The simdutf measurement feeding ADR-0003 is still outstanding. | AC-2.1 to AC-2.4, AC-2.6 |
-| **P2** next | Full `AdaNative` surface, blittable structs, ABI suite, handle free statics, `AdaUrl` ref struct | AC-1.3, AC-3.1 to AC-3.5, AC-4.6 |
-| **P3** | WPT corpus adapter, categories 1 to 21, `SafeHandle`, `AdaSearchParams`, `AdaIdna`, parity tests, ASAN and soak lanes | AC-1.2, AC-4.1 to AC-4.5, AC-4.7, AC-4.8 |
+| **P2** done | Full `AdaNative` surface, blittable structs, ABI suite, handle free statics, `AdaUrl` ref struct | AC-1.3, AC-3.1 to AC-3.5, AC-4.6 |
+| **P3** next | WPT corpus adapter, categories 1 to 21, `SafeHandle`, `AdaSearchParams`, `AdaIdna`, parity tests, ASAN and soak lanes | AC-1.2, AC-4.1 to AC-4.5, AC-4.7, AC-4.8 |
 | **P4** | Benchmarks W1 to W4 in three tiers, packaging, Alpine and NativeAOT tests, signing, SBOM, runbook, `release.yml` | AC-1.1, AC-1.4, AC-1.5, AC-2.5, AC-2.7, AC-5.1 to AC-5.8 |
 
 One target framework is what makes this five phases instead of eight. No fallback lane to build,

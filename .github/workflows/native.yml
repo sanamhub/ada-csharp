@@ -11,6 +11,9 @@ on:
       ada-tag:
         type: string
         default: v4.0.0
+    secrets:
+      MACOS_SIGNING_IDENTITY:
+        required: false
   workflow_dispatch:
     inputs:
       ada-tag:
@@ -58,7 +61,11 @@ jobs:
 
       - name: install build tools (macos)
         if: steps.cache.outputs.cache-hit != 'true' && startsWith(matrix.os, 'macos')
-        run: brew install ninja cmake
+        # cmake ships on the runner image, so only install what is missing. A plain
+        # "brew install" on an already present formula fails the step.
+        run: |
+          brew list ninja >/dev/null 2>&1 || brew install ninja
+          command -v cmake >/dev/null || brew install cmake
 
       - name: build (unix)
         if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'

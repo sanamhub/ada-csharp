@@ -1,3 +1,87 @@
 #nullable enable
-Ada.Url.AdaUrlInfo
-const Ada.Url.AdaUrlInfo.UpstreamAdaVersion = "4.0.0" -> string!
+Ada.Url.AdaHostType
+Ada.Url.AdaHostType.Domain = 0 -> Ada.Url.AdaHostType
+Ada.Url.AdaHostType.IPv4 = 1 -> Ada.Url.AdaHostType
+Ada.Url.AdaHostType.IPv6 = 2 -> Ada.Url.AdaHostType
+Ada.Url.AdaLibrary
+Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.File = 6 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.Ftp = 4 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.Http = 0 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.Https = 2 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.NotSpecial = 1 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.Ws = 3 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaSchemeType.Wss = 5 -> Ada.Url.AdaSchemeType
+Ada.Url.AdaUrl
+Ada.Url.AdaUrl.AdaUrl() -> void
+Ada.Url.AdaUrl.ClearHash() -> void
+Ada.Url.AdaUrl.ClearPort() -> void
+Ada.Url.AdaUrl.ClearSearch() -> void
+Ada.Url.AdaUrl.Components.get -> Ada.Url.AdaUrlComponents
+Ada.Url.AdaUrl.Dispose() -> void
+Ada.Url.AdaUrl.HasCredentials.get -> bool
+Ada.Url.AdaUrl.HasEmptyHostname.get -> bool
+Ada.Url.AdaUrl.HasHash.get -> bool
+Ada.Url.AdaUrl.HasHostname.get -> bool
+Ada.Url.AdaUrl.HasNonEmptyPassword.get -> bool
+Ada.Url.AdaUrl.HasNonEmptyUsername.get -> bool
+Ada.Url.AdaUrl.HasPassword.get -> bool
+Ada.Url.AdaUrl.HasPort.get -> bool
+Ada.Url.AdaUrl.HasSearch.get -> bool
+Ada.Url.AdaUrl.Hash.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.Host.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.HostType.get -> Ada.Url.AdaHostType
+Ada.Url.AdaUrl.Hostname.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.Href.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.IsValid.get -> bool
+Ada.Url.AdaUrl.Password.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.Pathname.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.Port.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.Protocol.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.SchemeType.get -> Ada.Url.AdaSchemeType
+Ada.Url.AdaUrl.Search.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrl.SetHash(System.ReadOnlySpan<byte> utf8) -> void
+Ada.Url.AdaUrl.SetSearch(System.ReadOnlySpan<byte> utf8) -> void
+Ada.Url.AdaUrl.TryGetOrigin(System.Span<byte> destination, out int written) -> bool
+Ada.Url.AdaUrl.TrySetHost(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetHostname(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetHref(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetPassword(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetPathname(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetPort(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetProtocol(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.TrySetUsername(System.ReadOnlySpan<byte> utf8) -> bool
+Ada.Url.AdaUrl.Username.get -> System.ReadOnlySpan<byte>
+Ada.Url.AdaUrlComponents
+Ada.Url.AdaUrlComponents.AdaUrlComponents() -> void
+Ada.Url.AdaUrlComponents.Equals(Ada.Url.AdaUrlComponents other) -> bool
+Ada.Url.AdaUrlComponents.HashStart.get -> uint
+Ada.Url.AdaUrlComponents.HostEnd.get -> uint
+Ada.Url.AdaUrlComponents.HostStart.get -> uint
+Ada.Url.AdaUrlComponents.PathnameStart.get -> uint
+Ada.Url.AdaUrlComponents.Port.get -> uint
+Ada.Url.AdaUrlComponents.ProtocolEnd.get -> uint
+Ada.Url.AdaUrlComponents.SearchStart.get -> uint
+Ada.Url.AdaUrlComponents.UsernameEnd.get -> uint
+const Ada.Url.AdaLibrary.PinnedVersion = "4.0.0" -> string!
+const Ada.Url.AdaUrlComponents.Omitted = 4294967295 -> uint
+override Ada.Url.AdaUrlComponents.Equals(object? obj) -> bool
+override Ada.Url.AdaUrlComponents.GetHashCode() -> int
+static Ada.Url.AdaLibrary.GetNativeVersionComponents() -> (int Major, int Minor, int Revision)
+static Ada.Url.AdaLibrary.MaxInputLength.get -> uint
+static Ada.Url.AdaLibrary.MaxInputLength.set -> void
+static Ada.Url.AdaLibrary.NativeVersion.get -> string!
+static Ada.Url.AdaUrl.CanParse(System.ReadOnlySpan<byte> utf8) -> bool
+static Ada.Url.AdaUrl.CanParse(System.ReadOnlySpan<byte> utf8, System.ReadOnlySpan<byte> baseUrl) -> bool
+static Ada.Url.AdaUrl.CanParse(System.ReadOnlySpan<char> input) -> bool
+static Ada.Url.AdaUrl.Parse(scoped System.ReadOnlySpan<byte> utf8) -> Ada.Url.AdaUrl
+static Ada.Url.AdaUrl.Parse(scoped System.ReadOnlySpan<char> input) -> Ada.Url.AdaUrl
+static Ada.Url.AdaUrl.TryGetHostname(System.ReadOnlySpan<byte> utf8, System.Span<byte> destination, out int written) -> bool
+static Ada.Url.AdaUrl.TryGetOrigin(System.ReadOnlySpan<byte> utf8, System.Span<byte> destination, out int written) -> bool
+static Ada.Url.AdaUrl.TryNormalize(System.ReadOnlySpan<byte> utf8, System.Span<byte> destination, out int written) -> bool
+static Ada.Url.AdaUrl.TryParse(scoped System.ReadOnlySpan<byte> utf8, out Ada.Url.AdaUrl url) -> bool
+static Ada.Url.AdaUrl.TryParse(scoped System.ReadOnlySpan<byte> utf8, scoped System.ReadOnlySpan<byte> baseUrl, out Ada.Url.AdaUrl url) -> bool
+static Ada.Url.AdaUrl.TryParse(scoped System.ReadOnlySpan<char> input, out Ada.Url.AdaUrl url) -> bool
+static Ada.Url.AdaUrlComponents.IsPresent(uint value) -> bool
+static Ada.Url.AdaUrlComponents.operator !=(Ada.Url.AdaUrlComponents left, Ada.Url.AdaUrlComponents right) -> bool
+static Ada.Url.AdaUrlComponents.operator ==(Ada.Url.AdaUrlComponents left, Ada.Url.AdaUrlComponents right) -> bool

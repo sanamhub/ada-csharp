@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    Copies the native library next to the test and benchmark output when a local build of it
+    exists. CI downloads the native.yml artifact into artifacts/native/<rid>/ before running
+    tests, and a developer with a C++ toolchain gets the same layout from native/build-*.
+    When the directory is absent the wildcards match nothing and this is a no-op, which is what
+    a machine with no C++ toolchain sees.
+  -->
+
+  <PropertyGroup>
+    <AdaNativeRid Condition="'$(AdaNativeRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</AdaNativeRid>
+    <AdaNativeDir Condition="'$(AdaNativeDir)' == ''">$(MSBuildThisFileDirectory)artifacts\native\$(AdaNativeRid)\</AdaNativeDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Wildcards, not literal names. A literal include of a file that is not there is a build
+         error, while a wildcard that matches nothing is silently empty. -->
+    <None Include="$(AdaNativeDir)*.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(AdaNativeDir)*.so" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(AdaNativeDir)*.dylib" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

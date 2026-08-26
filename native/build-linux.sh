@@ -42,8 +42,12 @@ CXX_FLAGS="$CXX_FLAGS -fstack-protector-strong -fcf-protection=full"
 LINK_FLAGS="-flto=thin -Wl,--gc-sections -Wl,-O2 -Wl,--as-needed"
 LINK_FLAGS="$LINK_FLAGS -Wl,-z,relro,-z,now -Wl,-z,noexecstack"
 
-# musl's _FORTIFY_SOURCE coverage differs from glibc and warns on some headers.
-if [ "$RID" != "linux-musl-x64" ]; then
+if [ "$RID" = "linux-musl-x64" ]; then
+  # musl's _FORTIFY_SOURCE coverage differs from glibc and warns on some headers. Also, clang
+  # on Alpine defaults to GNU ld, which needs the gold plugin for ThinLTO. lld handles it.
+  CXX_FLAGS="$CXX_FLAGS -fuse-ld=lld"
+  LINK_FLAGS="$LINK_FLAGS -fuse-ld=lld"
+else
   CXX_FLAGS="$CXX_FLAGS -D_FORTIFY_SOURCE=2"
 fi
 
