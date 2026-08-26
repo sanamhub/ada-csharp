@@ -77,6 +77,37 @@ jobs:
     name: benchmarks
     uses: ./.github/workflows/bench.yml
 
+  osx-x64-consumption:
+    # The one platform the release cannot verify inline. macos-13 is GitHub's retiring Intel
+    # image and queues for tens of minutes, so it lives here where waiting costs nothing.
+    #
+    # The binary itself is cross compiled on Apple Silicon and its architecture is checked with
+    # lipo during the build. What this adds is proof it actually loads and runs on Intel macOS.
+    name: osx-x64 consumption
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: artifacts/native/osx-x64
+          key: native-v4.0.0-osx-x64-${{ hashFiles('native/**') }}
+      - name: build the native
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          brew list ninja >/dev/null 2>&1 || brew install ninja
+          ./native/build-macos.sh --ada-tag v4.0.0 --rid osx-x64
+
+      - name: pack
+        run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out -p:AllowPartialNativePack=true
+
+      - name: consume the package
+        run: ./tests/packaging/verify-package.sh --package-dir out --rid osx-x64
+
   wpt-drift:
     name: corpus drift
     runs-on: ubuntu-24.04

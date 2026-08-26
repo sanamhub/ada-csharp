@@ -22,12 +22,17 @@ advertises an older feature mask.
 3. **Six RIDs:** `win-x64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`, `osx-x64`,
    `osx-arm64`. `win-arm64` deferred. No 32 bit native.
 
-   Which of them get built is per workflow rather than fixed. A pull request builds only the
-   four its test matrix runs on, the benchmark builds one, and the release builds all six.
-   `osx-x64` needs `macos-13`, a retiring Intel image whose queue ran to 37 minutes in practice
-   while every other leg finished in under three. Because `needs` is job level in GitHub
-   Actions, one queued matrix leg blocks every downstream job, so a pull request that does not
-   need that RID must not wait on it.
+   Which of them get built is per workflow rather than fixed. A pull request builds the four its
+   test matrix runs on, the benchmark builds the four it measures on, and a release builds all
+   six.
+
+   `osx-x64` is a special case. The binary is cross compiled on Apple Silicon through
+   `CMAKE_OSX_ARCHITECTURES`, so producing it is fast and needs no Intel host, and the build
+   checks the result with `lipo` so an arm64 binary cannot ship under that RID. Only *running*
+   an x86_64 binary needs `macos-13`, a retiring Intel image that queued 20 to 40 minutes on
+   every attempt and twice never started. Because `needs` is job level in GitHub Actions, that
+   one leg blocks everything behind it, so its consumption test runs nightly rather than in the
+   release path. A release that cannot start for 40 minutes is a release nobody cuts.
 4. **Two macOS RIDs rather than a `lipo` universal binary.** The RID graph already picks the
    right asset, and a universal binary doubles the size of every deployment for nothing. The
    `lipo` recipe stays in the build script for single file bundle consumers.

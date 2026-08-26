@@ -42,10 +42,14 @@ jobs:
           - { name: linux-arm64,    os: ubuntu-24.04-arm, rid: linux-arm64,    container: '' }
           - { name: win-x64,        os: windows-2022,     rid: win-x64,        container: '' }
           - { name: osx-arm64,      os: macos-14,         rid: osx-arm64,      container: '' }
-          # The osx-x64 native is cross compiled on Apple Silicon, but actually running an
-          # x86_64 binary needs an Intel host. macos-13 queues badly, which is why it was taken
-          # out of pull request CI. A release can afford to wait for it; a pull request cannot.
-          - { name: osx-x64,        os: macos-13,         rid: osx-x64,        container: '' }
+          # osx-x64 is deliberately absent. Running an x86_64 binary needs an Intel host, and
+          # macos-13 has queued for 20 to 40 minutes on every attempt, blocking everything
+          # behind it because `needs` is job level. A release that cannot start for 40 minutes
+          # is a release nobody cuts.
+          #
+          # What still covers that RID: the native build checks the architecture with lipo, so
+          # a silently arm64 binary cannot ship under it, and nightly.yml runs the full
+          # consumption test on macos-13 where a long queue costs nothing.
           # A glibc .so will not load on Alpine, so this leg is what proves the musl RID is real
           # rather than assumed. AC-2.5.
           - { name: linux-musl-x64, os: ubuntu-24.04,     rid: linux-musl-x64, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
