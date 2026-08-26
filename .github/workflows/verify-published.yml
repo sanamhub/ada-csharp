@@ -63,4 +63,6 @@ jobs:
           version="${{ inputs.version || github.event.release.tag_name }}"
           version="${version#v}"
           echo "verifying Ada.Url $version from nuget.org"
-          ./tests/packaging/verify-published.sh --version "$version"
+          # nuget.org documents validation and indexing as taking up to an hour, and this workflow
+          # fires the moment the release is created, so waiting is the expected path.
+          ./tests/packaging/verify-published.sh --version "$version" --wait-minutes 75

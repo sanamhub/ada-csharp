@@ -262,23 +262,18 @@ jobs:
               --skip-duplicate
           if ($LASTEXITCODE -ne 0) { throw "dotnet nuget push failed with exit code $LASTEXITCODE" }
 
-      # Everything before this tested a local artifact. This tests what nuget.org actually
-      # serves, which is the only thing a user ever sees. Indexing lags a push by a minute or
-      # two, so it retries rather than failing on the first miss.
-      - name: verify the published package
-        if: github.event_name == 'push'
-        shell: bash
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          for attempt in 1 2 3 4 5 6; do
-            if ./tests/packaging/verify-published.sh --version "$version"; then
-              exit 0
-            fi
-            echo "attempt $attempt did not find it yet, waiting for nuget.org indexing"
-            sleep 30
-          done
-          echo "::error::Ada.Url $version never became usable from nuget.org"
-          exit 1
+      # Verifying the published package does not happen here.
+      #
+      # It used to, with a three minute retry budget, on the assumption that indexing lags a push
+      # by a minute or two. nuget.org actually validates and indexes a new package before anything
+      # can restore it, and documents that as taking up to an hour. So the check failed, the job
+      # failed, and the release creation below was skipped, for a package that had published
+      # perfectly well and worked as soon as validation finished.
+      #
+      # Holding a runner idle for an hour to find that out is the wrong trade, and it would delay
+      # the release page by the same hour. The verify-published workflow does it instead: it fires
+      # on the release being published, waits for indexing properly, and installs the package on
+      # five platforms rather than on this one.
 
       # Notes come from CHANGELOG.md, not from the commit log. generate_release_notes would list
       # every commit since the previous tag, which on a first release means the entire history:

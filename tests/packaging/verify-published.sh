@@ -11,35 +11,54 @@ set -euo pipefail
 
 VERSION=""
 KEEP="false"
+WAIT_MINUTES="0"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --version) VERSION="$2"; shift 2 ;;
-    --keep)    KEEP="true";  shift 1 ;;
+    --version)       VERSION="$2";      shift 2 ;;
+    --keep)          KEEP="true";       shift 1 ;;
+    --wait-minutes)  WAIT_MINUTES="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
-[ -n "$VERSION" ] || { echo "usage: verify-published.sh --version <version> [--keep]" >&2; exit 2; }
+[ -n "$VERSION" ] || { echo "usage: verify-published.sh --version <version> [--wait-minutes N] [--keep]" >&2; exit 2; }
 
+# nuget.org validates and indexes a new package before anything can restore it, and documents that
+# as taking up to an hour. An earlier version of this allowed three minutes, then declared a
+# perfectly good release broken. Waiting is the normal case here, not the error case.
 echo "checking nuget.org for Ada.Url $VERSION"
+[ "$WAIT_MINUTES" != "0" ] && echo "  will wait up to $WAIT_MINUTES minutes for validation and indexing"
 
-# Ask the flat container directly. This is the same index restore uses, so if the version is not
-# here yet, no amount of retrying dotnet restore will help.
-INDEX="$(curl -sS --fail "https://api.nuget.org/v3-flatcontainer/ada.url/index.json" 2>/dev/null || true)"
-if [ -z "$INDEX" ]; then
-  echo "nuget.org has no Ada.Url package at all yet." >&2
-  echo "Indexing can lag a few minutes after a push. Try again shortly." >&2
-  exit 1
-fi
+deadline=$(( $(date +%s) + WAIT_MINUTES * 60 ))
+attempt=0
+while :; do
+  attempt=$(( attempt + 1 ))
 
-if ! grep -q "\"$VERSION\"" <<< "$INDEX"; then
-  echo "Ada.Url exists on nuget.org but $VERSION is not listed yet." >&2
-  echo "Versions currently indexed:" >&2
-  echo "$INDEX" >&2
-  exit 1
-fi
-echo "  version is indexed"
+  # Ask the flat container directly. This is the same index restore uses, so if the version is not
+  # here yet, no amount of retrying dotnet restore will help.
+  INDEX="$(curl -sS --fail "https://api.nuget.org/v3-flatcontainer/ada.url/index.json" 2>/dev/null || true)"
+
+  if [ -n "$INDEX" ] && grep -q "\"$VERSION\"" <<< "$INDEX"; then
+    echo "  version is indexed (attempt $attempt)"
+    break
+  fi
+
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    if [ -z "$INDEX" ]; then
+      echo "nuget.org still has no Ada.Url package after $WAIT_MINUTES minutes." >&2
+    else
+      echo "Ada.Url is on nuget.org but $VERSION never appeared after $WAIT_MINUTES minutes." >&2
+      echo "Versions currently indexed:" >&2
+      echo "$INDEX" >&2
+    fi
+    exit 1
+  fi
+
+  remaining=$(( (deadline - $(date +%s)) / 60 ))
+  echo "  not indexed yet, ${remaining}m left before giving up"
+  sleep 60
+done
 
 WORK="$(mktemp -d)"
 if [ "$KEEP" = "true" ]; then
