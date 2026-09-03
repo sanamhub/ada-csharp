@@ -71,7 +71,7 @@ jobs:
       # If the native cannot load, every benchmark reports the same suspiciously fast number,
       # because each one returns 0 immediately. Fail here instead, where the reason is obvious.
       - name: check the native loads
-        run: dotnet test -c Release --filter "Category=Abi"
+        run: dotnet test -c Release --filter-trait "Category=Abi"
 
       - name: run benchmarks
         run: >

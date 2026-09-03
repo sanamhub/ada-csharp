@@ -44,7 +44,7 @@ jobs:
           # The .NET runtime allocates in ways LSAN reports but we do not own. Only frames from
           # the native library and this library's interop are actionable.
           LSAN_SUPPRESSIONS: ${{ github.workspace }}/native/lsan.supp
-        run: dotnet test -c Release --filter "Category=Conformance"
+        run: dotnet test -c Release --filter-trait "Category=Conformance"
 
   soak:
     name: soak
@@ -71,7 +71,7 @@ jobs:
       # exception. The asan job above is the stronger leak check anyway: it sees native
       # allocations this library never touches.
       - name: soak
-        run: dotnet test -c Release --filter "Category=Stress"
+        run: dotnet test -c Release --filter-trait "Category=Stress"
 
   bench:
     name: benchmarks

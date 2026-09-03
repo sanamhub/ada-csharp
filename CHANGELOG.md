@@ -15,11 +15,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - README performance section reports sustained throughput and per platform ratios alongside the
   existing per call figures. The headline said "roughly twice as fast as `System.Uri`", which
-  came from a single URL microbenchmark with a hot cache on one platform. Validation is 3 to 4x
-  on every platform, a full parse is 1.9x on Linux x64 and level on Windows x64, and allocation
-  is zero everywhere.
+  came from a single URL microbenchmark with a hot cache on one platform. A full parse is 1.9x
+  on Linux x64 and level on Windows x64, and allocation is zero everywhere.
 - `docs/benchmarks/0.1.0-beta.1/` holds results for all four platforms. The alpha results are
   kept and marked superseded.
+- The test suite runs on Microsoft.Testing.Platform. xunit.v3 4.0.0 ships on MTP v2, which no
+  longer bridges to VSTest on the .NET 10 SDK, so `global.json` selects the MTP runner and the
+  VSTest host, adapter and collector are gone. Coverage now comes from
+  Microsoft.Testing.Extensions.CodeCoverage and the TRX report from
+  Microsoft.Testing.Extensions.TrxReport. `--filter "Category=X"` becomes `--filter-trait
+  "Category=X"` in every workflow. All 1,253 tests pass unchanged.
 
 ### Fixed
 
