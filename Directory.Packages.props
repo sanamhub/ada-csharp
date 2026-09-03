@@ -14,11 +14,13 @@
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
 
+  <!-- xunit.v3 4.0.0 runs on Microsoft.Testing.Platform v2, which dropped the VSTest bridge on
+       the .NET 10 SDK. global.json selects the MTP runner; the VSTest host, adapter and collector
+       are gone, and the reporters below replace what they used to provide. -->
   <ItemGroup Label="Test">
-    <PackageVersion Include="xunit.v3" Version="1.1.0" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.4.0" />
   </ItemGroup>
 
 </Project>

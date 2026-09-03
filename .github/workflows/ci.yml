@@ -68,9 +68,9 @@ jobs:
       - name: test
         run: >
           dotnet test -c Release --no-build
-          --filter "Category!=Stress"
-          --collect:"XPlat Code Coverage"
-          --logger "trx;LogFileName=test-results.trx"
+          --filter-not-trait "Category=Stress"
+          --coverage --coverage-output-format cobertura
+          --report-trx --report-trx-filename test-results.trx
           --results-directory TestResults
 
       # AC-1.2: zero conditional compilation in the repository (single TFM, ADR-0001).

@@ -712,10 +712,10 @@ benchmarks/Ada.Url.Benchmarks/
 One test project, not six. Traits (`Category=Conformance`, `Abi`, `Stress`) do the separation. A
 project per concern is build overhead at this size.
 
-The corpus suite is the bulk of the pyramid, and it is fast and in process. Coverage gate is 80%
-line and 70% branch through coverlet. No real PII in test data. URL vectors do
-legitimately contain `user:password@` forms, which are corpus literals and must never be replaced
-with anything real.
+The corpus suite is the bulk of the pyramid, and it is fast and in process. Coverage is 80% line
+and 70% branch, collected by Microsoft.Testing.Extensions.CodeCoverage. No real PII in test data.
+URL vectors do legitimately contain `user:password@` forms, which are corpus literals and must
+never be replaced with anything real.
 
 ### 4.2 Vectors
 
