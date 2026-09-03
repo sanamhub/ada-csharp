@@ -308,7 +308,7 @@ jobs:
           echo "--- release notes ---"
           cat release-notes.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: github.event_name == 'push'
         with:
           body_path: release-notes.md
