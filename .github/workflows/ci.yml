@@ -53,7 +53,7 @@ jobs:
           global-json-file: global.json
 
       - name: download native
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: native-${{ matrix.rid }}
           path: artifacts/native/${{ matrix.rid }}
@@ -128,7 +128,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: native-*
           path: artifacts/native

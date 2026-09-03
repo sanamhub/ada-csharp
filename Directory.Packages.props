@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Benchmarks">
-    <PackageVersion Include="BenchmarkDotNet" Version="0.15.2" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
 
   <!-- xunit.v3 4.0.0 runs on Microsoft.Testing.Platform v2, which dropped the VSTest bridge on

@@ -92,7 +92,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: native-*
           path: artifacts/native
@@ -133,11 +133,11 @@ jobs:
       id-token: write              # NuGet trusted publishing, so there is no long lived key
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: native-*
           path: artifacts/native
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: checksums
           path: manifest
@@ -308,7 +308,7 @@ jobs:
           echo "--- release notes ---"
           cat release-notes.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: github.event_name == 'push'
         with:
           body_path: release-notes.md
