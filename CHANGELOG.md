@@ -23,8 +23,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   longer bridges to VSTest on the .NET 10 SDK, so `global.json` selects the MTP runner and the
   VSTest host, adapter and collector are gone. Coverage now comes from
   Microsoft.Testing.Extensions.CodeCoverage and the TRX report from
-  Microsoft.Testing.Extensions.TrxReport. `--filter "Category=X"` becomes `--filter-trait
-  "Category=X"` in every workflow. All 1,253 tests pass unchanged.
+  Microsoft.Testing.Extensions.TrxReport. Every workflow filters with
+  `--filter-trait` rather than `--filter`. All 1,253 tests pass unchanged.
 
 ### Fixed
 
