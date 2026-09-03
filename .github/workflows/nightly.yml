@@ -55,7 +55,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: cache
         with:
           path: artifacts/native/linux-x64
@@ -91,7 +91,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: cache
         with:
           path: artifacts/native/osx-x64
