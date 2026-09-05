@@ -10,9 +10,9 @@ WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url
 Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers, Telegram,
 Datadog, Kong and Redpanda. This package brings the same parser, and the same results, to .NET.
 
-Allocation free on the UTF-8 path, where `System.Uri` costs around 370 bytes per URL. About 1.9x
-faster on Linux x64 and level on Windows x64, for a reason worth knowing before you adopt it.
-See performance.
+Zero allocation on the UTF-8 path, where `System.Uri` costs about 370 bytes per URL. 1.9x
+faster on Linux x64, 1.4x on macOS arm64, level on Windows x64. The [performance](#performance)
+section says why Windows is the odd one out.
 
 ```csharp
 using var url = AdaUrl.Parse("https://example.org/path/../file.txt"u8);
@@ -101,68 +101,54 @@ AdaIdna.ToUnicode("xn--bcher-kva.example");   // bücher.example
 
 ## Performance
 
-Two things are worth knowing before the tables. The allocation result is the strong one and it
-holds everywhere. The speed result varies by platform, and on Windows it mostly disappears.
+Two results, and they do not behave the same way. Allocation drops to zero on the span path on
+every platform. Speed depends on the platform, and on Windows there is none.
 
-### Like for like, against `System.Uri`
+| Platform | Parse and read three properties | Allocated |
+| --- | ---: | --- |
+| Linux x64 | **1.9x faster** | **0 B** against 288 B |
+| Linux arm64 | **1.9x faster** | **0 B** against 288 B |
+| macOS arm64 | **1.4x faster** | **0 B** against 288 B |
+| Windows x64 | level | **0 B** against 288 B |
 
-Parsing a plain URL and reading the host, path and query, measured on CI with both parsers in the
-same process on the same machine:
+Windows is built without whole program optimisation. Ada has no `__declspec(dllexport)`, so the
+build relies on CMake's `WINDOWS_EXPORT_ALL_SYMBOLS`, which runs `cmake -E __create_def` across
+the compiled objects to generate the export list. Under `/GL` those objects hold IL rather than
+COFF symbols and that step crashes, so `/GL` and `/LTCG` are off while Linux and macOS build with
+`-O3 -flto=thin`. Writing the export list by hand would fix it. Recorded in ADR-0003.
 
-| Platform | Parse and read | Validate only |
-| --- | ---: | ---: |
-| Linux x64 | **1.9x faster** | see below |
-| Linux arm64 | **1.9x faster** | see below |
-| macOS arm64 | **1.4x faster** | see below |
-| Windows x64 | about level | see below |
+### Numbers, Linux x64
 
-Windows is slower because the native library is built without whole program optimisation there.
-Ada has no `__declspec(dllexport)`, so the build relies on CMake's `WINDOWS_EXPORT_ALL_SYMBOLS`,
-which runs `cmake -E __create_def` across the compiled objects to generate the export list. With
-`/GL` those objects hold IL rather than COFF symbols and that step crashes, so `/GL` and `/LTCG`
-are off while Linux and macOS build with `-O3 -flto=thin`. Recorded in ADR-0003. Fixable by
-writing the export list by hand rather than generating it, which has not been done yet.
+A plain URL, `https://example.com/path`:
 
-### Validation is not the win it looks like
+| Call | Ada.Url | `System.Uri` | Speedup | Allocated |
+| --- | ---: | ---: | ---: | --- |
+| `TryParse` then 3 spans | **90 ns** | 175 ns | **1.9x** | **0 B** against 288 B |
+| `TryParse` then all 10 | **103 ns** | 175 ns | **1.7x** | **0 B** against 288 B |
+| `TryParse` then `GetString` | 112 ns | 175 ns | 1.6x | 72 B against 288 B |
+| `string` in, `string` out | 122 ns | 175 ns | 1.4x | 72 B against 288 B |
 
-`CanParse` answers "is this a valid URL" without building anything. Compared against the cheapest
-equivalent, `Uri.TryCreate` with the result discarded, it is **about 1.3x faster on a plain URL**
-and **slightly slower on a corpus heavy in internationalised hosts**, where full UTS-46 costs more
+A hard URL, with credentials, a non default port, an internationalised host, dot segments and a
+heavy percent encoded query:
+
+| Call | Ada.Url | `System.Uri` | Speedup | Allocated |
+| --- | ---: | ---: | ---: | --- |
+| `TryNormalize(utf8, buffer, out n)` | **1,141 ns** | 1,705 ns | **1.5x** | **0 B** against 2,160 B |
+| `TryParse` then 4 spans | **1,150 ns** | 1,705 ns | **1.5x** | **0 B** against 2,160 B |
+| `string` in, `string` out | 1,341 ns | 1,705 ns | 1.3x | 392 B against 2,160 B |
+
+Both parsers slow down on the hard URL, because IDNA and percent decoding are genuinely
+expensive. The gap that widens is allocation: 2,160 bytes against nothing.
+
+### Validating without parsing
+
+`CanParse` answers "is this a valid URL" without building anything. Against the cheapest
+equivalent, `Uri.TryCreate` with the result discarded, it is **1.3x faster on a plain URL** and
+**slightly slower on a corpus heavy in internationalised hosts**, where full UTS-46 costs more
 than what `System.Uri` does.
 
-It is worth using because it allocates nothing and because it is three times cheaper than parsing
-and throwing the result away, not because it beats `System.Uri` by a wide margin.
-
-An earlier version of this README claimed validation was about four times faster. That figure
-compared `CanParse` against `new Uri()` followed by reading three components, which is not the
-same work. The benchmark now gives it a like for like baseline in category `W0`.
-
-### A plain URL, Linux x64
-
-`https://example.com/path`
-
-| Call | Ada.Url | `System.Uri` | Ratio | Allocated |
-| --- | ---: | ---: | ---: | --- |
-| `AdaUrl.TryParse(utf8, out url)` then 3 spans | **90 ns** | 175 ns | 0.52x | **0 B** against 288 B |
-| `AdaUrl.TryParse(utf8, out url)` then all 10 | **103 ns** | 175 ns | 0.59x | **0 B** against 288 B |
-| `AdaUrl.TryParse(utf8, out url)` then `GetString` | 112 ns | 175 ns | 0.64x | 72 B against 288 B |
-| `string` in and `string` out | 122 ns | 175 ns | 0.70x | 72 B against 288 B |
-
-Lower ratio is faster. The first two rows allocate **nothing at all**. Not less, none.
-
-### A hard URL, Linux x64
-
-Credentials, a non default port, an internationalised host, dot segments and a heavy percent
-encoded query:
-
-| Call | Ada.Url | `System.Uri` | Ratio | Allocated |
-| --- | ---: | ---: | ---: | --- |
-| `AdaUrl.TryNormalize(utf8, buffer, out n)` | **1,141 ns** | 1,705 ns | 0.67x | **0 B** against 2,160 B |
-| `AdaUrl.TryParse(utf8, out url)` then 4 spans | **1,150 ns** | 1,705 ns | 0.67x | **0 B** against 2,160 B |
-| `string` in and `string` out | 1,341 ns | 1,705 ns | 0.79x | 392 B against 2,160 B |
-
-Both parsers slow down here, because IDNA and percent decoding are genuinely expensive. The gap
-that widens is allocation: **2,160 bytes against nothing**.
+Use it because it allocates nothing and is three times cheaper than parsing and throwing the
+result away, not because it beats `System.Uri` by a wide margin.
 
 ### Sustained throughput
 
@@ -177,47 +163,30 @@ on Windows, using the published package. Windows, so read this as the pessimisti
 | `Uri.TryCreate` then `.Host` | 1.56 M/s | 643 ns | 374 B, 39 gen0 per million |
 
 Throughput held between 1.8 and 2.0 M/s whether the working set was 6 KiB or 60 MiB, so this is
-not a cache effect. Across 16 threads it reaches 8.7 to 9.4 M/s. Two threads scale at 1.99x, so
-nothing serialises at the interop boundary; beyond that it is memory bandwidth bound.
+not a cache effect. Across 16 threads it reaches 8.7 to 9.4 M/s, and two threads scale at 1.99x,
+so nothing serialises at the interop boundary. Beyond that it is memory bandwidth bound.
 
-### Why a parse costs more than a validation
+A parse costs 338 ns more than a validation, 502 ns against 164 ns. That gap is neither parsing
+nor P/Invoke, which costs a couple of nanoseconds a call. `ada_parse` heap allocates a URL object
+and `ada_free` releases it, and that pair is about two thirds of what a parse costs. `ada_c.h`
+has no way to parse into caller supplied storage, so it is an upstream limit rather than
+something this package can route around. Benchmark `W4` measures it on every run.
 
-| | Per URL |
-| --- | ---: |
-| `CanParse`, nothing kept | 164 ns |
-| `TryParse` then `Dispose` | 502 ns |
-| difference | **338 ns** |
+### Reading these numbers
 
-That gap is neither parsing nor P/Invoke, which costs a couple of nanoseconds a call. `ada_parse`
-heap allocates a URL object and `ada_free` releases it, and that pair is about two thirds of what
-a parse costs. `ada_c.h` has no way to parse into caller supplied storage, so it is an upstream
-limit rather than something this package can route around. Benchmark `W4` measures the gap on
-every run, and it stays flat from a 100 URL working set to 200,000.
+Allocation is the result that holds everywhere. A service parsing 50,000 URLs a second allocates
+about 100 MB a second through `System.Uri` and nothing at all through the span path, and that
+difference is GC pauses rather than nanoseconds. Getting it needs UTF-8 in and spans out. Hand it
+a `string` and ask for a `string` back and you still win, by less.
 
-### Which number matters
-
-Allocation, usually. A service parsing 50,000 URLs a second allocates about 100 MB a second
-through `System.Uri` and nothing at all through the span path, and that difference is GC pauses
-rather than nanoseconds. It holds on every platform, including the one where the speed advantage
-does not.
-
-To get zero allocation you have to pass UTF-8 and read spans. Hand it a `string` and ask for a
-`string` back and you still win, by less. Both paths are measured above rather than one being
-quoted and the other implied.
-
-If speed is what you are here for, and you deploy on Windows, benchmark it against your own
-traffic before switching. The honest summary for Windows today is: same speed, no garbage,
-different specification.
-
-### Caveats
-
-Ratios are trustworthy, since both parsers ran in the same process on the same machine. **Absolute
-nanoseconds and rates are indicative only**: a shared CI runner has noisy neighbours and no
-frequency guarantee, and your hardware is not this hardware.
+Speedups are trustworthy, since both parsers ran in the same process on the same machine.
+**Absolute nanoseconds and rates are indicative only**: a shared CI runner has noisy neighbours
+and no frequency guarantee, and your hardware is not this hardware.
 
 The two parsers do not implement the same specification, so speed is only half of the comparison.
-`System.Uri` follows RFC 3986 and 3987; this follows WHATWG. They disagree on real inputs, which
-is what [`docs/system-uri-differences.md`](docs/system-uri-differences.md) is for.
+If speed is what you are here for and you deploy on Windows, benchmark your own traffic before
+switching. The honest summary for Windows today is: same speed, no garbage, different
+specification.
 
 Full results for all four platforms, the thousand URL batch workload and the UTF-16 transcode
 cost by input length are in

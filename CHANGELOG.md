@@ -13,10 +13,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- README performance section reports sustained throughput and per platform ratios alongside the
-  existing per call figures. The headline said "roughly twice as fast as `System.Uri`", which
+- README performance section reports sustained throughput and per platform speedups alongside
+  the existing per call figures. The headline said "roughly twice as fast as `System.Uri`", which
   came from a single URL microbenchmark with a hot cache on one platform. A full parse is 1.9x
   on Linux x64 and level on Windows x64, and allocation is zero everywhere.
+- README performance section is a third shorter, down from eight subsections to five, and the
+  comparison column now reads as a speedup, 1.9x, rather than a ratio below one, 0.52x, which is
+  easy to read backwards. The per platform table no longer has a column whose every cell said
+  "see below".
 - `docs/benchmarks/0.1.0-beta.1/` holds results for all four platforms. The alpha results are
   kept and marked superseded.
 - The test suite runs on Microsoft.Testing.Platform. xunit.v3 4.0.0 ships on MTP v2, which no
