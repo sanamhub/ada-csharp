@@ -146,13 +146,16 @@ function Resolve-Rva {
 
 $cetCompatible = $false
 $debugOffset = Resolve-Rva -Rva $debugRva
+$seen = @()
 
 for ($entry = 0; $entry -lt [int]($debugSize / 28); $entry++) {
-    $at = $debugOffset + $entry * 28
-    if ([System.BitConverter]::ToUInt32($bytes, $at + 12) -ne 20) { continue }  # EX_DLLCHARACTERISTICS
-
+    $at            = $debugOffset + $entry * 28
+    $type          = [System.BitConverter]::ToUInt32($bytes, $at + 12)
     $payloadSize   = [System.BitConverter]::ToUInt32($bytes, $at + 16)
     $payloadOffset = [System.BitConverter]::ToUInt32($bytes, $at + 24)
+    $seen += "type $type, $payloadSize bytes at file offset 0x$('{0:X}' -f $payloadOffset)"
+
+    if ($type -ne 20) { continue }  # EX_DLLCHARACTERISTICS
     if ($payloadSize -lt 4) { continue }
 
     $extended = [System.BitConverter]::ToUInt32($bytes, $payloadOffset)
@@ -161,6 +164,11 @@ for ($entry = 0; $entry -lt [int]($debugSize / 28); $entry++) {
 }
 
 if (-not $cetCompatible) {
+    # What the linker did emit, because "nothing found" and "found and misread" are different
+    # problems and the difference is one line of output. lld-link claims to support /cetcompat,
+    # so if this ever fires on an lld-link build the entries below say which of the two it is.
+    Write-Output 'debug directory entries:'
+    if ($seen) { $seen | ForEach-Object { "  $_" } } else { '  (none)' }
     Write-Error 'FAIL: no CET compatibility record. The linker took /CETCOMPAT and emitted nothing, or the flag was dropped.'
     exit 1
 }
