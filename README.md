@@ -117,12 +117,12 @@ optimisation: the Windows build has `/GL` and `/LTCG` off, because Ada has no
 crashes on the IL objects `/GL` produces. That part is true and is recorded in ADR-0003. The
 part that does not survive measurement is the idea that it explains the gap.
 
-Building with `/GL` behind a hand written export list moves the span path by under 5%, and not
-consistently in the same direction. Upstream's `src/ada.cpp` includes every other `.cpp`, so the
-library is a single translation unit and whole program optimisation has nothing to inline
-across. Issue [#18](https://github.com/sanamhub/ada-csharp/issues/18) has the numbers. The
-likelier causes, the MSVC code generator and the Windows heap under two allocations per parse,
-are [#19](https://github.com/sanamhub/ada-csharp/issues/19) and
+Building with `/GL` behind an export list generated from Ada's own `ada_c.h` moves the span path
+by under 5%, and not consistently in the same direction. Upstream's `src/ada.cpp` includes every
+other `.cpp`, so the library is a single translation unit and whole program optimisation has
+nothing to inline across. Issue [#18](https://github.com/sanamhub/ada-csharp/issues/18) has the
+numbers. The likelier causes are the MSVC code generator, and the Windows heap serving the two
+allocations every parse makes: [#19](https://github.com/sanamhub/ada-csharp/issues/19) and
 [#20](https://github.com/sanamhub/ada-csharp/issues/20).
 
 ### Numbers, Linux x64

@@ -133,7 +133,17 @@ jobs:
           if ($built.Count -eq 0) { throw 'no variants were built' }
 
           for ($round = 1; $round -le $repeats; $round++) {
-              foreach ($variant in $built) {
+              # Rotate the starting variant each round. Building once and looping was not enough
+              # on its own: a fixed order leaves a always first and d always last, so drift
+              # inside a round stays correlated with the variant, which is the confounder this is
+              # here to remove. Rotation is deterministic, so a rerun is still reproducible.
+              $offset = ($round - 1) % $built.Count
+              $order = @($built[$offset..($built.Count - 1)])
+              if ($offset -gt 0) { $order += $built[0..($offset - 1)] }
+
+              Write-Output "round ${round} order: $(($order | ForEach-Object { $_.Name }) -join ', ')"
+
+              foreach ($variant in $order) {
                   Write-Output "::group::$($variant.Name) round $round"
 
                   New-Item -ItemType Directory -Force -Path artifacts/native/win-x64 | Out-Null
