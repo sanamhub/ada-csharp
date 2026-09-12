@@ -10,9 +10,9 @@ WHATWG compliant URL parsing for .NET, built on [Ada](https://github.com/ada-url
 Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers, Telegram,
 Datadog, Kong and Redpanda. This package brings the same parser, and the same results, to .NET.
 
-Zero allocation on the UTF-8 path, where `System.Uri` costs about 370 bytes per URL. 1.9x
-faster on Linux x64, 1.4x on macOS arm64, level on Windows x64. The [performance](#performance)
-section says why Windows is the odd one out.
+Zero allocation on the UTF-8 path, where `System.Uri` costs about 370 bytes per URL. 1.9x faster
+on Linux x64, 1.4x on macOS arm64, about level on Windows x64. The
+[performance](#performance) section says why Windows is the odd one out.
 
 ```csharp
 using var url = AdaUrl.Parse("https://example.org/path/../file.txt"u8);
@@ -109,7 +109,7 @@ every platform. Speed depends on the platform, and on Windows there is none.
 | Linux x64 | **1.9x faster** | **0 B** against 288 B |
 | Linux arm64 | **1.9x faster** | **0 B** against 288 B |
 | macOS arm64 | **1.4x faster** | **0 B** against 288 B |
-| Windows x64 | level | **0 B** against 288 B |
+| Windows x64 | about level | **0 B** against 288 B |
 
 Windows is built without whole program optimisation. Ada has no `__declspec(dllexport)`, so the
 build relies on CMake's `WINDOWS_EXPORT_ALL_SYMBOLS`, which runs `cmake -E __create_def` across
@@ -190,7 +190,9 @@ specification.
 
 Full results for all four platforms, the thousand URL batch workload and the UTF-16 transcode
 cost by input length are in
-[`docs/benchmarks/0.1.0-beta.1/`](docs/benchmarks/0.1.0-beta.1/). Reproduce any of it with
+[`docs/benchmarks/0.1.0-beta.1/`](docs/benchmarks/0.1.0-beta.1/). Those pages print raw
+BenchmarkDotNet output, where the `Ratio` column is the inverse of the speedups here and lower is
+faster: `0.52x` there is `1.9x` on this page. Reproduce any of it with
 `dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks`.
 
 ## How it works
