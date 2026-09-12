@@ -159,17 +159,7 @@ $cmakeArgs = @(
     "-DCMAKE_SHARED_LINKER_FLAGS_RELEASE=$linkFlags"
 )
 
-# UseLldLink=false makes the ClangCL toolset link with link.exe instead of lld-link.
-#
-# Two reasons. lld-link accepted /CETCOMPAT without a word and emitted no
-# EX_DLLCHARACTERISTICS record, so the first clang-cl build compiled clean, set all four
-# DllCharacteristics bits, and had no shadow stack support. verify-windows.ps1 caught it. See
-# #19.
-#
-# The second reason is that it makes the experiment mean something. #19 asks whether the MSVC
-# code generator is what costs Windows its speed, and swapping the linker at the same time as
-# the compiler answers a different question.
-if ($Toolset -eq 'clang-cl') { $cmakeArgs += @('-T', 'ClangCL', '-DCMAKE_VS_GLOBALS=UseLldLink=false') }
+if ($Toolset -eq 'clang-cl') { $cmakeArgs += @('-T', 'ClangCL') }
 
 # CMAKE_PROJECT_TOP_LEVEL_INCLUDES runs our scripts straight after upstream's project() call,
 # which is how both variants change the ada target without a patch landing in the clone. A
@@ -196,7 +186,25 @@ Write-Output "configuring $Rid with toolset=$Toolset exports=$Exports ipo=$ipo"
 cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed with exit code $LASTEXITCODE" }
 
-cmake --build $build --config Release --parallel
+# clang-cl compiles, link.exe links.
+#
+# Two reasons. lld-link took /CETCOMPAT without a word and emitted no EX_DLLCHARACTERISTICS
+# record, so the clang-cl build compiled clean, exported everything, set all four
+# DllCharacteristics bits, and had no shadow stack support. verify-windows.ps1 caught it, twice.
+# And #19 is a question about the code generator, so swapping the linker at the same time as the
+# compiler would answer a different one.
+#
+# It has to be an MSBuild global property, passed on the command line after --, rather than
+# CMAKE_VS_GLOBALS. CMAKE_VS_GLOBALS writes into the vcxproj's Globals PropertyGroup, and
+# LLVM.Cpp.Common.props then sets `<UseLldLink>true</UseLldLink>` with no condition guarding it,
+# so a project level value is simply overwritten when those props import. A global property
+# cannot be overwritten by a PropertyGroup, which is the whole point of one.
+#
+# UseClangCl stays true, so this changes the linker and nothing else.
+$buildArgs = @('--build', $build, '--config', 'Release', '--parallel')
+if ($Toolset -eq 'clang-cl') { $buildArgs += @('--', '/p:UseLldLink=false') }
+
+cmake @buildArgs
 if ($LASTEXITCODE -ne 0) { throw "cmake build failed with exit code $LASTEXITCODE" }
 
 New-Item -ItemType Directory -Force -Path $out | Out-Null
