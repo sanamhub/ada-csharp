@@ -15,9 +15,12 @@ on:
   workflow_dispatch:
     inputs:
       categories:
-        description: 'Benchmark categories. W1 is a plain URL, W2 a hard one, W4 the parse and free cost.'
+        description: >
+          Comma separated benchmark categories. W1 is a plain URL, W2 a hard one, W4 the parse
+          and free cost. Comma rather than space, because several categories have a space in the
+          name, such as "W3 validate".
         type: string
-        default: 'W1 W2 W4'
+        default: 'W1,W2,W4'
       ada-tag:
         type: string
         default: v4.0.0
@@ -49,7 +52,7 @@ jobs:
           CATEGORIES: ${{ inputs.categories }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $categories = $env:CATEGORIES -split '\s+' | Where-Object { $_ }
+          $categories = $env:CATEGORIES -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 
           $variants = @(
               @{ name = 'a-msvc-allsymbols'; toolset = 'msvc';     exports = 'all-symbols' }
@@ -65,10 +68,16 @@ jobs:
               ./native/build-windows.ps1 -AdaTag $env:ADA_TAG -Toolset $v.toolset -Exports $v.exports
               ./native/verify-windows.ps1 artifacts/native/win-x64
 
-              # If the native fails to load, every benchmark returns 0 immediately and reports
-              # the same suspiciously fast number. Fail here, where the reason is obvious.
-              dotnet test -c Release --filter-trait "Category=Abi"
-              if ($LASTEXITCODE -ne 0) { throw "$($v.name): the native did not load" }
+              # The whole suite, not just the ABI smoke test. A variant built by a different
+              # toolset can load, answer the four symbols that gate loading, and still get a
+              # setter or an IDNA path wrong, and a benchmark measures a wrong answer just as
+              # happily as a right one. Stress is excluded to match ci.yml.
+              #
+              # This also catches the failure mode where the native does not load at all, which
+              # otherwise shows up as every benchmark returning 0 immediately and reporting the
+              # same suspiciously fast number.
+              dotnet test -c Release --filter-not-trait "Category=Stress"
+              if ($LASTEXITCODE -ne 0) { throw "$($v.name): conformance failed, so its numbers mean nothing" }
 
               Remove-Item -Recurse -Force BenchmarkDotNet.Artifacts -ErrorAction SilentlyContinue
               $benchArgs = @('--anyCategories') + $categories + @('--exporters', 'json', 'markdown', '--memory')

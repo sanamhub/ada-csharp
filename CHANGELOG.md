@@ -45,6 +45,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   with a ratio.
 - The nuget.org page had no project website link. `PackageProjectUrl` was never set.
 
+### Security
+
+- The win-x64 hardening gate checks CET instead of assuming it. `/CETCOMPAT` is recorded in the
+  PE debug directory rather than in `DllCharacteristics`, so `native/verify-windows.ps1` read
+  four bits and took the fifth on trust. A toolchain that accepts the flag and emits no record
+  would have shipped a binary with no shadow stack support, and nothing would have said so. The
+  check is skipped on machines that are not x64, where `/CETCOMPAT` has no equivalent.
+
 ### Known
 
 - The Windows native library is built without whole program optimisation, which costs roughly a

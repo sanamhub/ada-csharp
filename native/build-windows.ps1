@@ -124,7 +124,11 @@ if ($Exports -eq 'def') {
     $defFile = Join-Path $root "native/build/$Rid-exports.def"
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $defFile) | Out-Null
     New-AdaExportsDef -Header (Join-Path $src 'include/ada_c.h') -OutFile $defFile
-    $linkFlags += " /DEF:$defFile"
+
+    # Quoted, because the linker flags are one space delimited string by the time MSBuild sees
+    # them. A checkout under a path with a space in it would otherwise split this option in half
+    # and the linker would look for a definition file that does not exist.
+    $linkFlags += " /DEF:`"$defFile`""
     $injects += Join-Path $PSScriptRoot 'cmake/no-export-all-symbols.cmake'
 }
 
@@ -161,7 +165,18 @@ if ($Toolset -eq 'clang-cl') { $cmakeArgs += @('-T', 'ClangCL') }
 # which is how both variants change the ada target without a patch landing in the clone. A
 # patched clone would mean the artifact is no longer the pinned upstream tag, and the checksum
 # manifest and the SBOM both rest on it being exactly that.
+#
+# It arrived in CMake 3.24, and an older CMake drops an unknown -D without a word. def mode would
+# then keep WINDOWS_EXPORT_ALL_SYMBOLS on, run __create_def across IL objects, and die with the
+# 0xC0000005 this whole parameter exists to avoid. Say which version is missing instead.
 if ($injects.Count -gt 0) {
+    $reported = @(cmake --version)[0]
+    if ($reported -notmatch '(\d+)\.(\d+)') { throw "could not read a version out of `"$reported`"" }
+    $cmakeVersion = [version]"$($Matches[1]).$($Matches[2])"
+    if ($cmakeVersion -lt [version]'3.24') {
+        throw "cmake $cmakeVersion is too old. -Toolset clang-cl and -Exports def both need CMAKE_PROJECT_TOP_LEVEL_INCLUDES, which is CMake 3.24 or later."
+    }
+
     $list = ($injects | ForEach-Object { $_.Replace('\', '/') }) -join ';'
     $cmakeArgs += "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$list"
 }
