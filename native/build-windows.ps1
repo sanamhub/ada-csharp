@@ -159,7 +159,17 @@ $cmakeArgs = @(
     "-DCMAKE_SHARED_LINKER_FLAGS_RELEASE=$linkFlags"
 )
 
-if ($Toolset -eq 'clang-cl') { $cmakeArgs += @('-T', 'ClangCL') }
+# UseLldLink=false makes the ClangCL toolset link with link.exe instead of lld-link.
+#
+# Two reasons. lld-link accepted /CETCOMPAT without a word and emitted no
+# EX_DLLCHARACTERISTICS record, so the first clang-cl build compiled clean, set all four
+# DllCharacteristics bits, and had no shadow stack support. verify-windows.ps1 caught it. See
+# #19.
+#
+# The second reason is that it makes the experiment mean something. #19 asks whether the MSVC
+# code generator is what costs Windows its speed, and swapping the linker at the same time as
+# the compiler answers a different question.
+if ($Toolset -eq 'clang-cl') { $cmakeArgs += @('-T', 'ClangCL', '-DCMAKE_VS_GLOBALS=UseLldLink=false') }
 
 # CMAKE_PROJECT_TOP_LEVEL_INCLUDES runs our scripts straight after upstream's project() call,
 # which is how both variants change the ada target without a patch landing in the clone. A

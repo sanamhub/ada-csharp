@@ -11,8 +11,8 @@ Ada is the C++ URL parser behind Node.js, and is also used by Cloudflare Workers
 Datadog, Kong and Redpanda. This package brings the same parser, and the same results, to .NET.
 
 Zero allocation on the UTF-8 path, where `System.Uri` costs about 370 bytes per URL. 1.9x faster
-on Linux x64, 1.4x on macOS arm64, about level on Windows x64. The
-[performance](#performance) section says why Windows is the odd one out.
+on Linux x64, 1.4x on macOS arm64, about level on Windows x64. Why Windows is the odd one out is
+still open, and the [performance](#performance) section says what has been ruled out so far.
 
 ```csharp
 using var url = AdaUrl.Parse("https://example.org/path/../file.txt"u8);
@@ -111,11 +111,19 @@ every platform. Speed depends on the platform, and on Windows there is none.
 | macOS arm64 | **1.4x faster** | **0 B** against 288 B |
 | Windows x64 | about level | **0 B** against 288 B |
 
-Windows is built without whole program optimisation. Ada has no `__declspec(dllexport)`, so the
-build relies on CMake's `WINDOWS_EXPORT_ALL_SYMBOLS`, which runs `cmake -E __create_def` across
-the compiled objects to generate the export list. Under `/GL` those objects hold IL rather than
-COFF symbols and that step crashes, so `/GL` and `/LTCG` are off while Linux and macOS build with
-`-O3 -flto=thin`. Writing the export list by hand would fix it. Recorded in ADR-0003.
+Why Windows is the odd one out is still open. This README used to answer it with whole program
+optimisation: the Windows build has `/GL` and `/LTCG` off, because Ada has no
+`__declspec(dllexport)` and the export list therefore comes from `cmake -E __create_def`, which
+crashes on the IL objects `/GL` produces. That part is true and is recorded in ADR-0003. The
+part that does not survive measurement is the idea that it explains the gap.
+
+Building with `/GL` behind an export list generated from Ada's own `ada_c.h` moves the span path
+by under 5%, and not consistently in the same direction. Upstream's `src/ada.cpp` includes every
+other `.cpp`, so the library is a single translation unit and whole program optimisation has
+nothing to inline across. Issue [#18](https://github.com/sanamhub/ada-csharp/issues/18) has the
+numbers. The likelier causes are the MSVC code generator, and the Windows heap serving the two
+allocations every parse makes: [#19](https://github.com/sanamhub/ada-csharp/issues/19) and
+[#20](https://github.com/sanamhub/ada-csharp/issues/20).
 
 ### Numbers, Linux x64
 
