@@ -3,10 +3,15 @@ name: win-perf-experiment
 # Not part of CI, and not a gate. Answers #18 and #19: does whole program optimisation behind a
 # generated .def buy anything on Windows, and does clang-cl beat MSVC.
 #
-# One job, one runner, every variant in sequence. Comparing a number from one runner against a
-# number from another runner would measure the runners. Everything here is measured back to back
-# on the same machine in the same session, which is the only reason the comparison means
-# anything.
+# One job, one runner. Comparing a number from one runner against a number from another runner
+# would measure the runners. Everything here is measured on the same machine in the same session,
+# which is the only reason the comparison means anything.
+#
+# Each variant is built once, then the benchmark runs the variants in rotation, repeat by repeat.
+# The first run put every measurement of a variant next to every other measurement of the same
+# variant, and the runner drifted 7 percent between the first and the second, which is larger
+# than the effect being measured. Rotating spreads that drift across all of them instead of
+# handing it to one.
 #
 # Delete this workflow once both issues are closed. It exists to answer a question, not to be
 # maintained.
@@ -21,6 +26,18 @@ on:
           name, such as "W3 validate".
         type: string
         default: 'W1,W2,W4'
+      variants:
+        description: >
+          Comma separated variant letters. a is MSVC as shipped, b is MSVC with the generated
+          .def and /GL, c is clang-cl, d is clang-cl with the .def.
+        type: string
+        default: 'a,b,c,d'
+      repeats:
+        description: >
+          How many times to measure each variant. One run each cannot resolve a 3 percent
+          difference, which is what #18 turned out to need.
+        type: string
+        default: '3'
       ada-tag:
         type: string
         default: v4.0.0
@@ -36,7 +53,7 @@ jobs:
   compare:
     name: win-x64 build variants
     runs-on: windows-2022
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v7
@@ -45,24 +62,28 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: build and measure each variant
+      - name: build each variant
         shell: pwsh
         env:
           ADA_TAG: ${{ inputs.ada-tag }}
-          CATEGORIES: ${{ inputs.categories }}
+          VARIANTS: ${{ inputs.variants }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $categories = $env:CATEGORIES -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 
-          $variants = @(
-              @{ name = 'a-msvc-allsymbols'; toolset = 'msvc';     exports = 'all-symbols' }
-              @{ name = 'b-msvc-def-gl';     toolset = 'msvc';     exports = 'def' }
-              @{ name = 'c-clangcl';         toolset = 'clang-cl'; exports = 'all-symbols' }
-              @{ name = 'd-clangcl-def';     toolset = 'clang-cl'; exports = 'def' }
-          )
+          $catalogue = [ordered]@{
+              a = @{ name = 'a-msvc-allsymbols'; toolset = 'msvc';     exports = 'all-symbols' }
+              b = @{ name = 'b-msvc-def-gl';     toolset = 'msvc';     exports = 'def' }
+              c = @{ name = 'c-clangcl';         toolset = 'clang-cl'; exports = 'all-symbols' }
+              d = @{ name = 'd-clangcl-def';     toolset = 'clang-cl'; exports = 'def' }
+          }
 
-          foreach ($v in $variants) {
-              Write-Output "::group::$($v.name)"
+          $chosen = $env:VARIANTS -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ }
+          $unknown = $chosen | Where-Object { -not $catalogue.Contains($_) }
+          if ($unknown) { throw "unknown variant(s): $($unknown -join ', '). Known: $($catalogue.Keys -join ', ')" }
+
+          foreach ($letter in $chosen) {
+              $v = $catalogue[$letter]
+              Write-Output "::group::build $($v.name)"
 
               Remove-Item -Recurse -Force artifacts/native/win-x64 -ErrorAction SilentlyContinue
               ./native/build-windows.ps1 -AdaTag $env:ADA_TAG -Toolset $v.toolset -Exports $v.exports
@@ -79,34 +100,72 @@ jobs:
               dotnet test -c Release --filter-not-trait "Category=Stress"
               if ($LASTEXITCODE -ne 0) { throw "$($v.name): conformance failed, so its numbers mean nothing" }
 
-              Remove-Item -Recurse -Force BenchmarkDotNet.Artifacts -ErrorAction SilentlyContinue
-              $benchArgs = @('--anyCategories') + $categories + @('--exporters', 'json', 'markdown', '--memory')
-              dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks -- @benchArgs
-              if ($LASTEXITCODE -ne 0) { throw "$($v.name): benchmark run failed" }
+              # Stashed, because the benchmark phase swaps these in and out and rebuilding each
+              # time would cost an hour and prove nothing.
+              $stash = "variants/$($v.name)"
+              New-Item -ItemType Directory -Force -Path $stash | Out-Null
+              Copy-Item artifacts/native/win-x64/ada.dll "$stash/ada.dll" -Force
 
-              # BenchmarkDotNet exits 0 when its own validation rejects the run, so a broken
-              # harness otherwise produces a green job that measured nothing.
-              $results = @(Get-ChildItem BenchmarkDotNet.Artifacts/results -Filter *.md -ErrorAction SilentlyContinue)
-              if ($results.Count -eq 0) { throw "$($v.name): no results, check the validation output above" }
-
-              $dest = "out/$($v.name)"
-              New-Item -ItemType Directory -Force -Path $dest | Out-Null
-              Copy-Item BenchmarkDotNet.Artifacts/results/* $dest -Recurse -Force
-
-              $size = (Get-Item artifacts/native/win-x64/ada.dll).Length
-              Set-Content "$dest/variant.txt" @(
+              $size = (Get-Item "$stash/ada.dll").Length
+              Set-Content "$stash/variant.txt" @(
                   "variant: $($v.name)"
                   "toolset: $($v.toolset)"
                   "exports: $($v.exports)"
                   "ada.dll size: $size bytes"
               )
-
-              "## $($v.name)" | Out-File -Append $env:GITHUB_STEP_SUMMARY
-              "toolset ``$($v.toolset)``, exports ``$($v.exports)``, ada.dll $size bytes" |
-                  Out-File -Append $env:GITHUB_STEP_SUMMARY
-              foreach ($r in $results) { Get-Content $r | Out-File -Append $env:GITHUB_STEP_SUMMARY }
+              "built $($v.name): ada.dll $size bytes" | Out-File -Append $env:GITHUB_STEP_SUMMARY
 
               Write-Output '::endgroup::'
+          }
+
+      - name: measure, rotating through the variants
+        shell: pwsh
+        env:
+          CATEGORIES: ${{ inputs.categories }}
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $categories = $env:CATEGORIES -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+          $repeats = [int]$env:REPEATS
+          if ($repeats -lt 1) { throw "repeats must be at least 1, got $repeats" }
+
+          $built = @(Get-ChildItem variants -Directory | Sort-Object Name)
+          if ($built.Count -eq 0) { throw 'no variants were built' }
+
+          for ($round = 1; $round -le $repeats; $round++) {
+              foreach ($variant in $built) {
+                  Write-Output "::group::$($variant.Name) round $round"
+
+                  New-Item -ItemType Directory -Force -Path artifacts/native/win-x64 | Out-Null
+                  Copy-Item "$($variant.FullName)/ada.dll" artifacts/native/win-x64/ada.dll -Force
+
+                  # Copy-Item carries the source timestamp over, and Directory.Build.targets
+                  # copies the native with CopyToOutputDirectory=PreserveNewest. A stashed DLL
+                  # older than the one already sitting in bin would therefore not be copied, and
+                  # the round would silently measure the previous variant. Stamping it now is
+                  # what makes the swap actually take.
+                  (Get-Item artifacts/native/win-x64/ada.dll).LastWriteTime = Get-Date
+
+                  Remove-Item -Recurse -Force BenchmarkDotNet.Artifacts -ErrorAction SilentlyContinue
+                  $benchArgs = @('--anyCategories') + $categories + @('--exporters', 'json', 'markdown', '--memory')
+                  dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks -- @benchArgs
+                  if ($LASTEXITCODE -ne 0) { throw "$($variant.Name) round ${round}: benchmark run failed" }
+
+                  # BenchmarkDotNet exits 0 when its own validation rejects the run, so a broken
+                  # harness otherwise produces a green job that measured nothing.
+                  $results = @(Get-ChildItem BenchmarkDotNet.Artifacts/results -Filter *.md -ErrorAction SilentlyContinue)
+                  if ($results.Count -eq 0) { throw "$($variant.Name) round ${round}: no results, check the validation output above" }
+
+                  $dest = "out/$($variant.Name)/round-$round"
+                  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+                  Copy-Item BenchmarkDotNet.Artifacts/results/* $dest -Recurse -Force
+                  Copy-Item "$($variant.FullName)/variant.txt" "out/$($variant.Name)/variant.txt" -Force
+
+                  "## $($variant.Name), round $round" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+                  foreach ($r in $results) { Get-Content $r | Out-File -Append $env:GITHUB_STEP_SUMMARY }
+
+                  Write-Output '::endgroup::'
+              }
           }
 
       - uses: actions/upload-artifact@v7

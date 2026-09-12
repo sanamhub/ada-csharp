@@ -55,10 +55,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Known
 
-- The Windows native library is built without whole program optimisation, which costs roughly a
-  factor of two on the parse path. `/GL` breaks `cmake -E __create_def`, which the build depends
-  on because Ada has no `__declspec(dllexport)`. Writing the export list explicitly would allow
-  `/GL` and `/LTCG` to come back. Validation and allocation are unaffected. See ADR-0003.
+- The Windows native library is built without whole program optimisation. `/GL` breaks
+  `cmake -E __create_def`, which the build depends on because Ada has no
+  `__declspec(dllexport)`. Validation and allocation are unaffected. See ADR-0003.
+
+  This entry used to say the missing optimisation "costs roughly a factor of two on the parse
+  path". That was never measured and it is wrong. Building with `/GL` behind a generated export
+  list moves the span path by under 5%, and not consistently in the same direction, because
+  upstream's `src/ada.cpp` includes every other `.cpp` and so there is only one translation unit
+  for whole program optimisation to work across. Why Windows is level with `System.Uri` while
+  Linux is 1.9x ahead is still open. See #18, #19 and #20.
 
 ## [0.1.0-beta.1] - 2026-08-26
 
