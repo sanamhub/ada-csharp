@@ -97,6 +97,72 @@ if ($failed) {
     exit 1
 }
 
-# CET shadow stack compatibility lives in the debug directory rather than DllCharacteristics,
-# so it is reported by the linker flag being present and not gated here.
 Write-Output 'PASS: ASLR, high entropy VA, DEP and CFG all set'
+
+# --- CET ---------------------------------------------------------------------------------
+# CET shadow stack compatibility is not in DllCharacteristics. The linker records it in the debug
+# directory, as an IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS entry whose payload has bit 0x0001 set.
+#
+# This used to go ungated, on the reasoning that passing /CETCOMPAT was proof enough. It is not.
+# A different toolset can take the flag and emit no record, and the artifact then ships with no
+# shadow stack support and nothing anywhere says so. Read the record.
+
+$machine = [System.BitConverter]::ToUInt16($bytes, $peOffset + 4)
+
+# /CETCOMPAT is x64 only. There is no arm64 equivalent to look for, so this is skipped rather
+# than failed for win-arm64.
+if ($machine -ne 0x8664) {
+    Write-Output ('SKIP: CET is x64 only, and this is machine 0x{0:X4}' -f $machine)
+    exit 0
+}
+
+$magic          = [System.BitConverter]::ToUInt16($bytes, $optionalHeader)
+$dataDirectories = $optionalHeader + $(if ($magic -eq 0x20B) { 0x70 } else { 0x60 })
+
+# Data directory 6 is the debug directory.
+$debugRva  = [System.BitConverter]::ToUInt32($bytes, $dataDirectories + 6 * 8)
+$debugSize = [System.BitConverter]::ToUInt32($bytes, $dataDirectories + 6 * 8 + 4)
+if ($debugRva -eq 0 -or $debugSize -eq 0) { Write-Error 'FAIL: no debug directory, so no CET record'; exit 1 }
+
+# Section headers follow the optional header, 40 bytes each, and are what turns a virtual
+# address back into a file offset.
+$sectionCount = [System.BitConverter]::ToUInt16($bytes, $peOffset + 6)
+$sectionStart = $optionalHeader + [System.BitConverter]::ToUInt16($bytes, $peOffset + 20)
+
+function Resolve-Rva {
+    param([Parameter(Mandatory)][uint32]$Rva)
+
+    for ($i = 0; $i -lt $sectionCount; $i++) {
+        $header      = $sectionStart + $i * 40
+        $virtual     = [System.BitConverter]::ToUInt32($bytes, $header + 12)
+        $rawSize     = [System.BitConverter]::ToUInt32($bytes, $header + 16)
+        $rawPointer  = [System.BitConverter]::ToUInt32($bytes, $header + 20)
+        if ($Rva -ge $virtual -and $Rva -lt ($virtual + $rawSize)) {
+            return $rawPointer + ($Rva - $virtual)
+        }
+    }
+    throw "RVA 0x$('{0:X}' -f $Rva) is in no section"
+}
+
+$cetCompatible = $false
+$debugOffset = Resolve-Rva -Rva $debugRva
+
+for ($entry = 0; $entry -lt [int]($debugSize / 28); $entry++) {
+    $at = $debugOffset + $entry * 28
+    if ([System.BitConverter]::ToUInt32($bytes, $at + 12) -ne 20) { continue }  # EX_DLLCHARACTERISTICS
+
+    $payloadSize   = [System.BitConverter]::ToUInt32($bytes, $at + 16)
+    $payloadOffset = [System.BitConverter]::ToUInt32($bytes, $at + 24)
+    if ($payloadSize -lt 4) { continue }
+
+    $extended = [System.BitConverter]::ToUInt32($bytes, $payloadOffset)
+    $cetCompatible = ($extended -band 0x0001) -ne 0
+    break
+}
+
+if (-not $cetCompatible) {
+    Write-Error 'FAIL: no CET compatibility record. The linker took /CETCOMPAT and emitted nothing, or the flag was dropped.'
+    exit 1
+}
+
+Write-Output 'PASS: CET compatible'

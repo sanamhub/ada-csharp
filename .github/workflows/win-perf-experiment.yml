@@ -1,0 +1,117 @@
+name: win-perf-experiment
+
+# Not part of CI, and not a gate. Answers #18 and #19: does whole program optimisation behind a
+# generated .def buy anything on Windows, and does clang-cl beat MSVC.
+#
+# One job, one runner, every variant in sequence. Comparing a number from one runner against a
+# number from another runner would measure the runners. Everything here is measured back to back
+# on the same machine in the same session, which is the only reason the comparison means
+# anything.
+#
+# Delete this workflow once both issues are closed. It exists to answer a question, not to be
+# maintained.
+
+on:
+  workflow_dispatch:
+    inputs:
+      categories:
+        description: >
+          Comma separated benchmark categories. W1 is a plain URL, W2 a hard one, W4 the parse
+          and free cost. Comma rather than space, because several categories have a space in the
+          name, such as "W3 validate".
+        type: string
+        default: 'W1,W2,W4'
+      ada-tag:
+        type: string
+        default: v4.0.0
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  compare:
+    name: win-x64 build variants
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      # TODO: pin these to full commit SHAs before the first release.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: build and measure each variant
+        shell: pwsh
+        env:
+          ADA_TAG: ${{ inputs.ada-tag }}
+          CATEGORIES: ${{ inputs.categories }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $categories = $env:CATEGORIES -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+
+          $variants = @(
+              @{ name = 'a-msvc-allsymbols'; toolset = 'msvc';     exports = 'all-symbols' }
+              @{ name = 'b-msvc-def-gl';     toolset = 'msvc';     exports = 'def' }
+              @{ name = 'c-clangcl';         toolset = 'clang-cl'; exports = 'all-symbols' }
+              @{ name = 'd-clangcl-def';     toolset = 'clang-cl'; exports = 'def' }
+          )
+
+          foreach ($v in $variants) {
+              Write-Output "::group::$($v.name)"
+
+              Remove-Item -Recurse -Force artifacts/native/win-x64 -ErrorAction SilentlyContinue
+              ./native/build-windows.ps1 -AdaTag $env:ADA_TAG -Toolset $v.toolset -Exports $v.exports
+              ./native/verify-windows.ps1 artifacts/native/win-x64
+
+              # The whole suite, not just the ABI smoke test. A variant built by a different
+              # toolset can load, answer the four symbols that gate loading, and still get a
+              # setter or an IDNA path wrong, and a benchmark measures a wrong answer just as
+              # happily as a right one. Stress is excluded to match ci.yml.
+              #
+              # This also catches the failure mode where the native does not load at all, which
+              # otherwise shows up as every benchmark returning 0 immediately and reporting the
+              # same suspiciously fast number.
+              dotnet test -c Release --filter-not-trait "Category=Stress"
+              if ($LASTEXITCODE -ne 0) { throw "$($v.name): conformance failed, so its numbers mean nothing" }
+
+              Remove-Item -Recurse -Force BenchmarkDotNet.Artifacts -ErrorAction SilentlyContinue
+              $benchArgs = @('--anyCategories') + $categories + @('--exporters', 'json', 'markdown', '--memory')
+              dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks -- @benchArgs
+              if ($LASTEXITCODE -ne 0) { throw "$($v.name): benchmark run failed" }
+
+              # BenchmarkDotNet exits 0 when its own validation rejects the run, so a broken
+              # harness otherwise produces a green job that measured nothing.
+              $results = @(Get-ChildItem BenchmarkDotNet.Artifacts/results -Filter *.md -ErrorAction SilentlyContinue)
+              if ($results.Count -eq 0) { throw "$($v.name): no results, check the validation output above" }
+
+              $dest = "out/$($v.name)"
+              New-Item -ItemType Directory -Force -Path $dest | Out-Null
+              Copy-Item BenchmarkDotNet.Artifacts/results/* $dest -Recurse -Force
+
+              $size = (Get-Item artifacts/native/win-x64/ada.dll).Length
+              Set-Content "$dest/variant.txt" @(
+                  "variant: $($v.name)"
+                  "toolset: $($v.toolset)"
+                  "exports: $($v.exports)"
+                  "ada.dll size: $size bytes"
+              )
+
+              "## $($v.name)" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+              "toolset ``$($v.toolset)``, exports ``$($v.exports)``, ada.dll $size bytes" |
+                  Out-File -Append $env:GITHUB_STEP_SUMMARY
+              foreach ($r in $results) { Get-Content $r | Out-File -Append $env:GITHUB_STEP_SUMMARY }
+
+              Write-Output '::endgroup::'
+          }
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: win-perf-experiment
+          path: out/
+          retention-days: 30
