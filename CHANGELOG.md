@@ -23,6 +23,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "see below".
 - `docs/benchmarks/0.1.0-beta.1/` holds results for all four platforms. The alpha results are
   kept and marked superseded.
+- The win-x64 native library is built with whole program optimisation, behind an export list
+  generated from upstream's `include/ada_c.h`. `ada.dll` drops from 487,936 bytes to 279,552,
+  43% smaller, and a hard URL parses about 7% faster. Both changed at once, so that 7% belongs to
+  the pair and not to either half. A plain URL does not move measurably. The
+  exported surface narrows from every mangled C++ symbol in the library to the 79 functions the
+  C API declares, which is a breaking change only for something linking against Ada's internals
+  directly: this package imports 79 entry points and the header declares exactly 79. Measured
+  over three rotated rounds in #18, decided in ADR-0006.
 - The test suite runs on Microsoft.Testing.Platform. xunit.v3 4.0.0 ships on MTP v2, which no
   longer bridges to VSTest on the .NET 10 SDK, so `global.json` selects the MTP runner and the
   VSTest host, adapter and collector are gone. Coverage now comes from
@@ -55,16 +63,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Known
 
-- The Windows native library is built without whole program optimisation. `/GL` breaks
-  `cmake -E __create_def`, which the build depends on because Ada has no
-  `__declspec(dllexport)`. Validation and allocation are unaffected. See ADR-0003.
-
-  This entry used to say the missing optimisation "costs roughly a factor of two on the parse
-  path". That was never measured and it is wrong. Building with `/GL` behind a generated export
-  list moves the span path by under 5%, and not consistently in the same direction, because
-  upstream's `src/ada.cpp` includes every other `.cpp` and so there is only one translation unit
-  for whole program optimisation to work across. Why Windows is level with `System.Uri` while
-  Linux is 1.9x ahead is still open. See #18, #19 and #20.
+- Why Windows is level with `System.Uri` while Linux is 1.9x ahead is not explained. Whole
+  program optimisation was the standing answer and it is not the right one: the generated export
+  list and `/GL` together are worth about 7% on a hard URL, not the factor of two this file used
+  to claim without measuring, and the two were changed together so neither can take the credit
+  alone. The hypotheses still standing are the MSVC code generator and the Windows heap serving
+  the two allocations every parse makes. See #19 and #20.
 
 ## [0.1.0-beta.1] - 2026-08-26
 

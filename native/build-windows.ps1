@@ -12,9 +12,12 @@
     MultiThreadedDLL matches the CRT that .NET processes already load. A static CRT inside a DLL
     sitting next to .NET is a heap mismatch waiting to happen.
 
-    -Toolset and -Exports exist to measure issues #18 and #19. Both default to what this script
-    has always done, so a normal build is unchanged. Whichever variant does not win gets deleted
-    rather than left here as dead configuration.
+    -Exports defaults to def: the export list is generated from upstream's include/ada_c.h and
+    whole program optimisation is on. That is measured, not assumed. See ADR-0006 and #18.
+
+    -Toolset still defaults to msvc. clang-cl is unmeasured, because it cannot currently produce
+    a binary that passes the CET gate. See #19. It gets deleted rather than left here as dead
+    configuration once that question is answered either way.
 #>
 [CmdletBinding()]
 param(
@@ -25,10 +28,14 @@ param(
     # source, different optimiser, which is the whole question in #19.
     [ValidateSet('msvc', 'clang-cl')][string]$Toolset = 'msvc',
 
-    # all-symbols leans on upstream's WINDOWS_EXPORT_ALL_SYMBOLS and exports every mangled C++
-    # symbol in the library. def generates an export list from upstream's include/ada_c.h and
-    # exports only the ada_* C API, which also lets /GL back in. See #18.
-    [ValidateSet('all-symbols', 'def')][string]$Exports = 'all-symbols'
+    # def generates an export list from upstream's include/ada_c.h, exports only the ada_* C API,
+    # and lets /GL back in. It is the default because it measured 7% faster on the hard URL path
+    # and halves the DLL. See ADR-0006.
+    #
+    # all-symbols is upstream's WINDOWS_EXPORT_ALL_SYMBOLS, exporting every mangled C++ symbol in
+    # the library with no whole program optimisation. Kept so the comparison can be rerun, which
+    # #18 will want when the pinned tag moves.
+    [ValidateSet('def', 'all-symbols')][string]$Exports = 'def'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -111,18 +111,21 @@ every platform. Speed depends on the platform, and on Windows there is none.
 | macOS arm64 | **1.4x faster** | **0 B** against 288 B |
 | Windows x64 | about level | **0 B** against 288 B |
 
-Why Windows is the odd one out is still open. This README used to answer it with whole program
-optimisation: the Windows build has `/GL` and `/LTCG` off, because Ada has no
-`__declspec(dllexport)` and the export list therefore comes from `cmake -E __create_def`, which
-crashes on the IL objects `/GL` produces. That part is true and is recorded in ADR-0003. The
-part that does not survive measurement is the idea that it explains the gap.
+Why Windows is the odd one out is still open, and whole program optimisation is not the answer.
+This README used to say it was.
 
-Building with `/GL` behind an export list generated from Ada's own `ada_c.h` moves the span path
-by under 5%, and not consistently in the same direction. Upstream's `src/ada.cpp` includes every
-other `.cpp`, so the library is a single translation unit and whole program optimisation has
-nothing to inline across. Issue [#18](https://github.com/sanamhub/ada-csharp/issues/18) has the
-numbers. The likelier causes are the MSVC code generator, and the Windows heap serving the two
-allocations every parse makes: [#19](https://github.com/sanamhub/ada-csharp/issues/19) and
+It used to be off, because Ada has no `__declspec(dllexport)`, so the export list came from
+`cmake -E __create_def`, which crashes on the IL objects `/GL` produces. Generating the export
+list from Ada's own `ada_c.h` takes that step out of the build, so `/GL` and `/LTCG` are on now.
+Measured, the two together are worth about 7% on a hard URL, nothing measurable on a plain one,
+and a 43% smaller DLL. They changed at once, so neither half can claim the 7% on its own. Worth
+having, nowhere near the factor of two this README once implied. The numbers are in
+[#18](https://github.com/sanamhub/ada-csharp/issues/18) and the decision in ADR-0006.
+
+Upstream's `src/ada.cpp` includes every other `.cpp`, so the library is a single translation unit
+and there was never much for whole program optimisation to inline across. The hypotheses still
+standing are the MSVC code generator and the Windows heap serving the two allocations every parse
+makes: [#19](https://github.com/sanamhub/ada-csharp/issues/19) and
 [#20](https://github.com/sanamhub/ada-csharp/issues/20).
 
 ### Numbers, Linux x64
@@ -193,8 +196,8 @@ and no frequency guarantee, and your hardware is not this hardware.
 
 The two parsers do not implement the same specification, so speed is only half of the comparison.
 If speed is what you are here for and you deploy on Windows, benchmark your own traffic before
-switching. The honest summary for Windows today is: same speed, no garbage, different
-specification.
+switching. The honest summary for Windows today: level with `System.Uri` on a plain URL, a few
+percent ahead on a hard one, no garbage either way, different specification.
 
 Full results for all four platforms, the thousand URL batch workload and the UTF-16 transcode
 cost by input length are in

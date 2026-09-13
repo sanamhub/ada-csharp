@@ -51,7 +51,7 @@ jobs:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v7
 
-      # Keyed on the build scripts, not on all of native/.
+      # Keyed on everything that decides what the binary is, and nothing that does not.
       #
       # native/** included CHECKSUMS.txt, which is the manifest the release verifies against.
       # Committing an updated manifest changed the key, which forced a rebuild, which produced a
@@ -60,10 +60,15 @@ jobs:
       #
       # The verify scripts are excluded for the same reason: they inspect the binary, they do not
       # produce it, and a fix to one of them should not throw away six caches.
+      #
+      # native/cmake/*.cmake is in, because the win-x64 build injects those through
+      # CMAKE_PROJECT_TOP_LEVEL_INCLUDES and they decide whether the DLL exports the C API or
+      # every symbol in the library. Leaving them out meant a change to the export behaviour
+      # could reuse a cached DLL built the old way and ship it.
       - name: compute cache key
         id: key
         shell: bash
-        run: echo "k=native-${ADA_TAG}-${{ matrix.rid }}-${{ hashFiles('native/build-linux.sh', 'native/build-macos.sh', 'native/build-musl.sh', 'native/build-windows.ps1') }}" >> "$GITHUB_OUTPUT"
+        run: echo "k=native-${ADA_TAG}-${{ matrix.rid }}-${{ hashFiles('native/build-linux.sh', 'native/build-macos.sh', 'native/build-musl.sh', 'native/build-windows.ps1', 'native/cmake/*.cmake') }}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache@v6
         id: cache
