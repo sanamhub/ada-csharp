@@ -25,7 +25,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   kept and marked superseded.
 - The win-x64 native library is built with whole program optimisation, behind an export list
   generated from upstream's `include/ada_c.h`. `ada.dll` drops from 487,936 bytes to 279,552,
-  43% smaller, and a hard URL parses about 7% faster. A plain URL does not move measurably. The
+  43% smaller, and a hard URL parses about 7% faster. Both changed at once, so that 7% belongs to
+  the pair and not to either half. A plain URL does not move measurably. The
   exported surface narrows from every mangled C++ symbol in the library to the 79 functions the
   C API declares, which is a breaking change only for something linking against Ada's internals
   directly: this package imports 79 entry points and the header declares exactly 79. Measured
@@ -63,10 +64,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Known
 
 - Why Windows is level with `System.Uri` while Linux is 1.9x ahead is not explained. Whole
-  program optimisation was the standing answer and it is not the right one: turning it on is
-  worth about 7%, not the factor of two this file used to claim without measuring. The
-  hypotheses still standing are the MSVC code generator and the Windows heap serving the two
-  allocations every parse makes. See #19 and #20.
+  program optimisation was the standing answer and it is not the right one: the generated export
+  list and `/GL` together are worth about 7% on a hard URL, not the factor of two this file used
+  to claim without measuring, and the two were changed together so neither can take the credit
+  alone. The hypotheses still standing are the MSVC code generator and the Windows heap serving
+  the two allocations every parse makes. See #19 and #20.
 
 ## [0.1.0-beta.1] - 2026-08-26
 

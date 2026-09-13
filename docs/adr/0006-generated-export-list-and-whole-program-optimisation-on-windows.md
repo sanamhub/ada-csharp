@@ -68,10 +68,25 @@ The factor of two was wrong. So was "it does not matter".
 The Windows DLL is 43 percent smaller and about 7 percent faster on URLs heavy enough to do real
 work. On a plain URL the difference is not measurable on a shared runner.
 
+**That 7 percent belongs to the pair, not to `/GL`.** The two variants differed in two ways at
+once, the export list and whole program optimisation, so the measurement cannot say which one
+earned it. A smaller image has better locality and the binary halved, so the export list is not
+obviously the passive half. Splitting them needs a third variant, the `.def` with `/GL` off, and
+that run has not happened because it would not change this decision: both are taken either way.
+Anyone quoting the 7 percent should quote it for the pair.
+
 Anyone linking against a mangled C++ symbol in `ada.dll` loses it. Nobody can be doing that
 through this package: the wrapper imports 79 entry points and `include/ada_c.h` declares exactly
 79. A direct consumer of the native binary could be, and for them this is a breaking change to
 the artifact, which is why it is written down here rather than slipped in.
+
+That 79 against 79 is **checked by the build, not asserted here**. The generated list only has to
+miss one declaration, or upstream only has to rename one function on a tag bump, and the result
+is a DLL that links, ships, and throws `EntryPointNotFoundException` the first time a consumer
+reaches the entry point that went missing. So `native/verify-windows.ps1` reads every
+`EntryPoint` out of `AdaNative.cs` and fails the build unless the DLL exports all of them. The
+`-lt 60` guard in the generator and the four name smoke test in the verifier are not enough on
+their own: both would pass a DLL that is missing exactly the one function nobody tested.
 
 `native/CHECKSUMS.txt` changes for `win-x64`, and the reproducibility check has to confirm that
 `/LTCG` still produces the same bytes twice. If it does not, this decision is reverted rather

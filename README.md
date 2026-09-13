@@ -117,9 +117,10 @@ This README used to say it was.
 It used to be off, because Ada has no `__declspec(dllexport)`, so the export list came from
 `cmake -E __create_def`, which crashes on the IL objects `/GL` produces. Generating the export
 list from Ada's own `ada_c.h` takes that step out of the build, so `/GL` and `/LTCG` are on now.
-Measured, it is worth about 7% on a hard URL, nothing measurable on a plain one, and a 43%
-smaller DLL. Worth having, nowhere near the factor of two this README once implied. The numbers
-are in [#18](https://github.com/sanamhub/ada-csharp/issues/18) and the decision in ADR-0006.
+Measured, the two together are worth about 7% on a hard URL, nothing measurable on a plain one,
+and a 43% smaller DLL. They changed at once, so neither half can claim the 7% on its own. Worth
+having, nowhere near the factor of two this README once implied. The numbers are in
+[#18](https://github.com/sanamhub/ada-csharp/issues/18) and the decision in ADR-0006.
 
 Upstream's `src/ada.cpp` includes every other `.cpp`, so the library is a single translation unit
 and there was never much for whole program optimisation to inline across. The hypotheses still
@@ -195,8 +196,8 @@ and no frequency guarantee, and your hardware is not this hardware.
 
 The two parsers do not implement the same specification, so speed is only half of the comparison.
 If speed is what you are here for and you deploy on Windows, benchmark your own traffic before
-switching. The honest summary for Windows today is: same speed, no garbage, different
-specification.
+switching. The honest summary for Windows today: level with `System.Uri` on a plain URL, a few
+percent ahead on a hard one, no garbage either way, different specification.
 
 Full results for all four platforms, the thousand URL batch workload and the UTF-16 transcode
 cost by input length are in
