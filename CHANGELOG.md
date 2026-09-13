@@ -5,6 +5,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] - 2026-09-13
+
+Still beta. No public API changed in this release: it is a faster and much smaller Windows
+binary, a hardening gate that was not actually gating, and a performance section that now says
+what the measurements support rather than what was assumed.
+
 ### Added
 
 - Benchmark `W4`, which measures the gap between validating a URL and parsing one. About two
@@ -63,12 +69,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Known
 
-- Why Windows is level with `System.Uri` while Linux is 1.9x ahead is not explained. Whole
-  program optimisation was the standing answer and it is not the right one: the generated export
-  list and `/GL` together are worth about 7% on a hard URL, not the factor of two this file used
-  to claim without measuring, and the two were changed together so neither can take the credit
-  alone. The hypotheses still standing are the MSVC code generator and the Windows heap serving
-  the two allocations every parse makes. See #19 and #20.
+- Windows is level with `System.Uri` where Linux is 1.9x ahead, and the cause is now narrowed to
+  allocation. Whole program optimisation was the standing answer and it is the wrong one: the
+  generated export list and `/GL` together are worth about 7% on a hard URL, not the factor of
+  two this file used to claim without measuring, and the two changed together so neither can take
+  the credit alone.
+
+  What the benchmarks actually say is that Ada's non-allocating work is not slow on Windows at
+  all. `CanParse` costs 40.9 ns there against 47.0 ns on Linux. The whole divergence is in the
+  step from validating to parsing, which is where `ada_parse` allocates a result object and the
+  `std::string` buffer inside it: 95.3 ns on Windows against 43.2 ns on Linux, 2.2x, and 2.8x
+  once normalised against the same machine's managed baseline.
+
+  That points at the allocator rather than the code generator, so #20 is the live question and
+  #19 is much less promising than it looked. Tracked in #20.
 
 ## [0.1.0-beta.1] - 2026-08-26
 
