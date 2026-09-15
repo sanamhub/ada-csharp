@@ -1,0 +1,88 @@
+name: alloc-probe
+
+# Issue #20. Dispatch only. Delete this workflow, and native/bench/, when #20 closes.
+#
+# Answers one question: is the Windows parse gap the allocator, or is it the rest of what
+# ada_parse does. The managed benchmarks can only answer it by subtracting validate from parse,
+# and that difference holds the allocations, the buffer fill and the offset arithmetic together.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ada-tag:
+        description: ada release tag to probe
+        default: v4.0.0
+
+permissions:
+  contents: read
+
+env:
+  ADA_TAG: ${{ inputs.ada-tag || 'v4.0.0' }}
+
+jobs:
+  probe:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022, label: win-x64   }
+          - { os: ubuntu-24.04, label: linux-x64 }
+    steps:
+      - uses: actions/checkout@v7
+
+      # The amalgamation, not the repository, because the probe needs one translation unit and
+      # no build system. src/ada.cpp includes ada_c.cpp, so the release asset carries the C API.
+      - name: fetch the amalgamation
+        shell: bash
+        run: |
+          mkdir -p probe && cd probe
+          base="https://github.com/ada-url/ada/releases/download/${ADA_TAG}"
+          for f in ada.cpp ada.h ada_c.h; do
+            curl -sSLf -o "$f" "$base/$f"
+          done
+          cp ../native/bench/alloc-probe.cpp .
+          ls -l
+
+      # Flags track native/build-windows.ps1 and native/build-linux.sh. They are not identical:
+      # no LTO, because a single translation unit has nothing to link across, and no hardening
+      # flags, because this artifact is never shipped.
+      #
+      # vswhere rather than a hard coded edition path, so this does not break the day the runner
+      # image stops shipping Enterprise.
+      - name: build and run (windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath`) do set VSROOT=%%i
+          if not defined VSROOT exit /b 1
+          call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+          cd probe
+          cl /nologo /O2 /Ob3 /Oi /Gy /Gw /EHsc /DNDEBUG /std:c++20 /MD alloc-probe.cpp ada.cpp /Fe:probe.exe || exit /b 1
+          probe.exe > result.txt 2>&1 || exit /b 1
+          type result.txt
+
+      - name: build and run (linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cd probe
+          clang++ -O3 -DNDEBUG -march=x86-64-v2 -mtune=generic -std=c++20 alloc-probe.cpp ada.cpp -o probe
+          ./probe | tee result.txt
+
+      - name: step summary
+        shell: bash
+        run: |
+          {
+            echo "### ${{ matrix.label }}"
+            echo '```'
+            cat probe/result.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: alloc-probe-${{ matrix.label }}
+          path: probe/result.txt
+          retention-days: 7
