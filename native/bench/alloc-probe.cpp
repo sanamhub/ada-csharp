@@ -18,7 +18,13 @@
 // If the replay loop is as much slower on Windows as the full parse is, the allocator explains
 // the gap. If it is not, something else does and #20 is answered the other way.
 #include "ada.h"
+
+// ada_c.h carries no extern "C" guard of its own, so including it from C++ declares every
+// ada_* function with C++ linkage and nothing links. That is issue #21's first half, seen
+// here rather than argued from the source.
+extern "C" {
 #include "ada_c.h"
+}
 
 #include <algorithm>
 #include <chrono>
