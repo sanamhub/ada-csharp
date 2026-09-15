@@ -123,6 +123,20 @@ Recorded record_parse(const char* url, std::size_t length) {
     return out;
 }
 
+// ada_set_href re-parses into an existing handle, so a caller with a loop can allocate the
+// result object once instead of once per URL. It is not free: set_href parses into a fresh
+// aggregator and copy assigns it, so the string buffer is still allocated and then copied.
+// Whether that trades well is a question for the timer, not for reading the source.
+int record_set_href(ada_url handle, const char* url, std::size_t length) {
+    ada_set_href(handle, url, length);
+
+    g_count = 0;
+    g_recording = true;
+    g_sink += ada_set_href(handle, url, length) ? 1 : 0;
+    g_recording = false;
+    return g_count;
+}
+
 int record_can_parse(const char* url, std::size_t length) {
     ada_can_parse(url, length);
 
@@ -139,10 +153,14 @@ void run(const char* label, const char* url) {
     const int validate_allocations = record_can_parse(url, length);
     const Recorded parsed = record_parse(url, length);
 
+    ada_url reused = ada_parse(url, length);
+    const int reuse_allocations = record_set_href(reused, url, length);
+
     std::printf("\n## %s\n", label);
     std::printf("url            %s\n", url);
     std::printf("bytes          %zu\n", length);
     std::printf("can_parse      %d allocation(s)\n", validate_allocations);
+    std::printf("set_href       %d allocation(s)\n", reuse_allocations);
     std::printf("parse          %d allocation(s)", parsed.count);
     if (g_overflowed) std::printf("  (RECORDER OVERFLOWED, count is a floor)");
     std::printf("\nparse sizes    ");
@@ -170,9 +188,15 @@ void run(const char* label, const char* url) {
         g_sink += count ? reinterpret_cast<std::uintptr_t>(blocks[0]) : 0u;
     });
 
+    const double reuse = measure([&] {
+        g_sink += ada_set_href(reused, url, length) ? 1u : 0u;
+    });
+    ada_free(reused);
+
     std::printf("\n%-22s %10s %10s\n", "", "ns/op", "x control");
     std::printf("%-22s %10.1f %10.2f\n", "can_parse (control)", control, 1.0);
     std::printf("%-22s %10.1f %10.2f\n", "parse + free", full, full / control);
+    std::printf("%-22s %10.1f %10.2f\n", "set_href, handle kept", reuse, reuse / control);
     std::printf("%-22s %10.1f %10.2f\n", "allocations only", replay, replay / control);
     std::printf("%-22s %10.1f %10.2f\n", "parse - can_parse", full - control,
                 (full - control) / control);
