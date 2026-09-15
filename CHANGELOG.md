@@ -5,6 +5,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Benchmark `W4` gained `ReuseHandleAndReadHostname`, which re-parses into one `AdaUrl` through
+  `TrySetHref` instead of allocating a URL object per URL. It is the only lever the binding has
+  over the native allocation and it is worth the most on Windows.
+- `native/bench/alloc-probe.cpp` and a dispatch only workflow that runs it on Windows and Linux.
+  It replaces global `operator new` to count and size what `ada_parse` allocates, then times
+  `ada_can_parse`, `ada_parse` with `ada_free`, a replay of just the recorded allocations, and
+  `ada_set_href` on a kept handle, reporting each against the allocation free control because the
+  two runners are different machines.
+
+### Changed
+
+- README says why Windows is slower instead of listing hypotheses, and documents handle reuse
+  with the case where it does not help. The Windows gap is the heap: `ada_parse` allocates twice
+  per URL and replaying those two allocations alone costs 87 ns on Windows against 22 ns on
+  Linux, which is 76% of everything the Windows parse spends beyond validating. Reproduced in two
+  runs, decided in ADR-0007, measured in #20.
+- The claim that the native allocation is "an upstream limit rather than something this package
+  can route around" was half wrong and is corrected. `ada_set_href` re-parses into an existing
+  handle, so a loop can avoid one of the two allocations. Worth 27% on Windows and 8% on Linux
+  on a plain URL, and nothing at all on a hard one.
+
+### Fixed
+
+- The ADR-0001 gate stopped reading generated code. It greps `src` and `tests` for `#if` and runs
+  after the build, so it was walking `obj` too. xunit.v3 4.0.1 added an
+  `#if XUNIT_GENERATED_DISABLE_WARNINGS` guard to its generated test entry point and failed a gate
+  about source on a dependency bump that touched none.
+
 ## [0.1.0-beta.2] - 2026-09-13
 
 Still beta. No public API changed in this release: it is a faster and much smaller Windows

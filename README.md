@@ -111,8 +111,8 @@ every platform. Speed depends on the platform, and on Windows there is none.
 | macOS arm64 | **1.4x faster** | **0 B** against 288 B |
 | Windows x64 | about level | **0 B** against 288 B |
 
-Why Windows is the odd one out is still open, and whole program optimisation is not the answer.
-This README used to say it was.
+Why Windows is the odd one out is answered: it is the allocator, and whole program optimisation
+is not the answer. This README used to say it was.
 
 It used to be off, because Ada has no `__declspec(dllexport)`, so the export list came from
 `cmake -E __create_def`, which crashes on the IL objects `/GL` produces. Generating the export
@@ -123,10 +123,18 @@ having, nowhere near the factor of two this README once implied. The numbers are
 [#18](https://github.com/sanamhub/ada-csharp/issues/18) and the decision in ADR-0006.
 
 Upstream's `src/ada.cpp` includes every other `.cpp`, so the library is a single translation unit
-and there was never much for whole program optimisation to inline across. The hypotheses still
-standing are the MSVC code generator and the Windows heap serving the two allocations every parse
-makes: [#19](https://github.com/sanamhub/ada-csharp/issues/19) and
-[#20](https://github.com/sanamhub/ada-csharp/issues/20).
+and there was never much for whole program optimisation to inline across.
+
+What costs the rest is the Windows heap. `ada_parse` allocates twice per URL, 96 and 32 bytes,
+and replaying just those two allocations with no parsing in the loop costs 87 ns on Windows
+against 22 ns on Linux. That is 76% of everything the Windows parse spends beyond validating,
+reproduced in two runs. The measurement is in
+[#20](https://github.com/sanamhub/ada-csharp/issues/20), the decision in ADR-0007, and the probe
+that produced it is `native/bench/alloc-probe.cpp`.
+
+No allocator is bundled to hide it. That would make this `ada.dll` differ from upstream's at the
+one place the checksum manifest and the SBOM exist to say it does not, and it would override the
+allocator of a process we do not own. There is a way to get some of it back, below.
 
 ### Numbers, Linux x64
 
@@ -161,6 +169,38 @@ than what `System.Uri` does.
 Use it because it allocates nothing and is three times cheaper than parsing and throwing the
 result away, not because it beats `System.Uri` by a wide margin.
 
+### Parsing many URLs on Windows
+
+Two thirds of a parse is `ada_parse` allocating a URL object and `ada_free` releasing it, and on
+Windows that allocation costs about 4x what it costs on Linux. A loop does not have to pay it
+per URL. `TrySetHref` re-parses into a handle you already have:
+
+```csharp
+// One result object for the whole loop instead of one per URL.
+using var url = AdaUrl.Parse(urls[0]);
+
+foreach (byte[] next in urls)
+{
+    if (!url.TrySetHref(next)) continue;
+    Consume(url.Hostname);
+}
+```
+
+| Plain URL, per call | Linux x64 | Windows x64 |
+| --- | ---: | ---: |
+| parse, then free | 69 ns | 162 ns |
+| `TrySetHref` on a kept handle | **64 ns** | **118 ns** |
+
+27% on Windows, 8% on Linux. Unlike every other table on this page those two rows are native
+measurements from `native/bench/alloc-probe.cpp`, not the managed benchmark, so do not line them
+up against the nanoseconds above. Benchmark `W4` now measures the same thing through the binding
+and the next results run will carry it. It is worth nothing on a hard URL, 1,741 ns against 1,771, because
+`set_href` still allocates four times there and the IDNA work dominates either way. So this is
+for high volume loops over ordinary URLs, not a blanket recommendation.
+
+The handle is reused, so anything you read out of it is invalidated by the next `TrySetHref`.
+Copy what you need before the next iteration, the same rule that already applies to every setter.
+
 ### Sustained throughput
 
 Ten million parses over a corpus of a million distinct URLs, one thread of a 16 core x64 desktop
@@ -180,8 +220,9 @@ so nothing serialises at the interop boundary. Beyond that it is memory bandwidt
 A parse costs 338 ns more than a validation, 502 ns against 164 ns. That gap is neither parsing
 nor P/Invoke, which costs a couple of nanoseconds a call. `ada_parse` heap allocates a URL object
 and `ada_free` releases it, and that pair is about two thirds of what a parse costs. `ada_c.h`
-has no way to parse into caller supplied storage, so it is an upstream limit rather than
-something this package can route around. Benchmark `W4` measures it on every run.
+has no way to parse into caller supplied storage, so half of it is an upstream limit. The other
+half is the result object, and keeping one handle avoids it: see above. Benchmark `W4` measures
+the gap on every run.
 
 ### Reading these numbers
 

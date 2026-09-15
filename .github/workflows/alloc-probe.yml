@@ -1,6 +1,7 @@
 name: alloc-probe
 
-# Issue #20. Dispatch only. Delete this workflow, and native/bench/, when #20 closes.
+# Issue #20, answered in ADR-0007. Dispatch only. Kept so the numbers can be rechecked when the
+# pinned ada tag moves, the same reason ADR-0006 kept the all-symbols build path.
 #
 # Answers one question: is the Windows parse gap the allocator, or is it the rest of what
 # ada_parse does. The managed benchmarks can only answer it by subtracting validate from parse,

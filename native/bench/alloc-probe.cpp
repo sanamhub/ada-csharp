@@ -15,8 +15,10 @@
 //      because the Windows and Linux runners are different machines and raw nanoseconds across
 //      them mean nothing.
 //
-// If the replay loop is as much slower on Windows as the full parse is, the allocator explains
-// the gap. If it is not, something else does and #20 is answered the other way.
+// The replay loop turned out to be 4x slower on Windows, which is 76% of the gap, so #20 is
+// answered: the allocator. Kept rather than deleted with the issue, on the same reasoning that
+// kept the all-symbols build path in ADR-0006: the number has to be recheckable when the pinned
+// ada tag moves. See ADR-0007.
 #include "ada.h"
 
 // ada_c.h carries no extern "C" guard of its own, so including it from C++ declares every

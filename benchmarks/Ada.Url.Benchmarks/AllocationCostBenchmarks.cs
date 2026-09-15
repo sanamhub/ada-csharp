@@ -145,6 +145,49 @@ public class AllocationCostBenchmarks
         return total;
     }
 
+    /// <summary>
+    /// The same work as <see cref="ParseAndReadHostname"/>, but re-parsing into one handle instead
+    /// of allocating a URL object per URL.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the only lever the binding has over the native allocation, and it matters most on
+    /// Windows, where <c>native/bench/alloc-probe.cpp</c> measured the two allocations
+    /// <c>ada_parse</c> makes at about four times what they cost on Linux. See ADR-0007.
+    /// </para>
+    /// <para>
+    /// It saves one allocation of the two, not both. <c>url_aggregator::set_href</c> parses into a
+    /// fresh aggregator and copy assigns it, so the string buffer is still allocated by the
+    /// temporary. The result object is what is saved.
+    /// </para>
+    /// <para>
+    /// One extra parse is paid to seed the handle, which is a tenth of a percent of a thousand
+    /// operation batch and is left in rather than corrected for.
+    /// </para>
+    /// </remarks>
+    [Benchmark(OperationsPerInvoke = Batch), BenchmarkCategory("W4")]
+    public int ReuseHandleAndReadHostname()
+    {
+        if (!AdaUrl.TryParse(Next(), out AdaUrl url))
+        {
+            return 0;
+        }
+
+        using (url)
+        {
+            int total = 0;
+            for (int i = 0; i < Batch; i++)
+            {
+                if (url.TrySetHref(Next()))
+                {
+                    total += url.Hostname.Length;
+                }
+            }
+
+            return total;
+        }
+    }
+
     /// <summary>Five components rather than one, for the same reason.</summary>
     [Benchmark(OperationsPerInvoke = Batch), BenchmarkCategory("W4")]
     public int ParseAndReadFive()
