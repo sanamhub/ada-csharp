@@ -74,11 +74,17 @@ jobs:
           --results-directory TestResults
 
       # AC-1.2: zero conditional compilation in the repository (single TFM, ADR-0001).
+      #
+      # obj and bin are excluded because this step runs after the build, so everything a
+      # source generator wrote is sitting under src and tests too. ADR-0001 is about code we
+      # write. What a package's generator emits is not ours and can change on any bump:
+      # xunit.v3 4.0.1 added an "#if XUNIT_GENERATED_DISABLE_WARNINGS" guard to its test
+      # entry point and failed this gate on a dependency bump that touched no source at all.
       - name: assert no conditional compilation
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          if grep -rn --include='*.cs' -E '^\s*#(if|else|elif|endif)\b' src tests; then
+          if grep -rn --include='*.cs' --exclude-dir=obj --exclude-dir=bin -E '^\s*#(if|else|elif|endif)\b' src tests; then
             echo "::error::#if found. ADR-0001 requires zero conditional compilation."
             exit 1
           fi
