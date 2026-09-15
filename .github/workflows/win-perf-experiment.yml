@@ -1,7 +1,7 @@
 name: win-perf-experiment
 
-# Not part of CI, and not a gate. Answers #18 and #19: does whole program optimisation behind a
-# generated .def buy anything on Windows, and does clang-cl beat MSVC.
+# Not part of CI, and not a gate. Answers #18: does whole program optimisation behind a generated
+# .def buy anything on Windows.
 #
 # One job, one runner. Comparing a number from one runner against a number from another runner
 # would measure the runners. Everything here is measured on the same machine in the same session,
@@ -13,8 +13,10 @@ name: win-perf-experiment
 # than the effect being measured. Rotating spreads that drift across all of them instead of
 # handing it to one.
 #
-# Delete this workflow once both issues are closed. It exists to answer a question, not to be
-# maintained.
+# Kept after #18 closed so the comparison can be rerun when the pinned ada tag moves, which is the
+# same reason ADR-0006 kept the all-symbols path in native/build-windows.ps1. The clang-cl
+# variants are gone with #19: that question turned out to be the heap rather than the compiler,
+# and ADR-0007 has the measurement.
 
 on:
   workflow_dispatch:
@@ -29,9 +31,9 @@ on:
       variants:
         description: >
           Comma separated variant letters. a is MSVC as shipped, b is MSVC with the generated
-          .def and /GL, c is clang-cl, d is clang-cl with the .def.
+          .def and /GL.
         type: string
-        default: 'a,b,c,d'
+        default: 'a,b'
       repeats:
         description: >
           How many times to measure each variant. One run each cannot resolve a 3 percent
@@ -71,10 +73,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           $catalogue = [ordered]@{
-              a = @{ name = 'a-msvc-allsymbols'; toolset = 'msvc';     exports = 'all-symbols' }
-              b = @{ name = 'b-msvc-def-gl';     toolset = 'msvc';     exports = 'def' }
-              c = @{ name = 'c-clangcl';         toolset = 'clang-cl'; exports = 'all-symbols' }
-              d = @{ name = 'd-clangcl-def';     toolset = 'clang-cl'; exports = 'def' }
+              a = @{ name = 'a-msvc-allsymbols'; exports = 'all-symbols' }
+              b = @{ name = 'b-msvc-def-gl';     exports = 'def' }
           }
 
           $chosen = $env:VARIANTS -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ }
@@ -86,13 +86,13 @@ jobs:
               Write-Output "::group::build $($v.name)"
 
               Remove-Item -Recurse -Force artifacts/native/win-x64 -ErrorAction SilentlyContinue
-              ./native/build-windows.ps1 -AdaTag $env:ADA_TAG -Toolset $v.toolset -Exports $v.exports
+              ./native/build-windows.ps1 -AdaTag $env:ADA_TAG -Exports $v.exports
               ./native/verify-windows.ps1 artifacts/native/win-x64
 
-              # The whole suite, not just the ABI smoke test. A variant built by a different
-              # toolset can load, answer the four symbols that gate loading, and still get a
-              # setter or an IDNA path wrong, and a benchmark measures a wrong answer just as
-              # happily as a right one. Stress is excluded to match ci.yml.
+              # The whole suite, not just the ABI smoke test. A variant can load, answer the
+              # four symbols that gate loading, and still get a setter or an IDNA path wrong, and
+              # a benchmark measures a wrong answer just as happily as a right one. Stress is
+              # excluded to match ci.yml.
               #
               # This also catches the failure mode where the native does not load at all, which
               # otherwise shows up as every benchmark returning 0 immediately and reporting the
@@ -109,7 +109,6 @@ jobs:
               $size = (Get-Item "$stash/ada.dll").Length
               Set-Content "$stash/variant.txt" @(
                   "variant: $($v.name)"
-                  "toolset: $($v.toolset)"
                   "exports: $($v.exports)"
                   "ada.dll size: $size bytes"
               )

@@ -28,6 +28,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   handle, so a loop can avoid one of the two allocations. Worth 27% on Windows and 8% on Linux
   on a plain URL, and nothing at all on a hard one.
 
+### Removed
+
+- The clang-cl toolset option in `native/build-windows.ps1`, `native/cmake/clang-cl-tweaks.cmake`,
+  the toolset probe workflow, and the two clang-cl variants in the performance experiment. It
+  existed to answer #19, whether a different code generator closes the Windows gap. ADR-0007
+  answered that from the other direction: the gap is the heap, and both compilers link against
+  the same one. The path also carried a build flag that never worked, `/p:UseLldLink=false`,
+  which is worse to leave in than to remove.
+
 ### Fixed
 
 - The ADR-0001 gate stopped reading generated code. It greps `src` and `tests` for `#if` and runs

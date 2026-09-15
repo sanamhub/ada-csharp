@@ -14,19 +14,11 @@
 
     -Exports defaults to def: the export list is generated from upstream's include/ada_c.h and
     whole program optimisation is on. That is measured, not assumed. See ADR-0006 and #18.
-
-    -Toolset still defaults to msvc. clang-cl is unmeasured, because it cannot currently produce
-    a binary that passes the CET gate. See #19. It gets deleted rather than left here as dead
-    configuration once that question is answered either way.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$AdaTag,
     [string]$Rid = 'win-x64',
-
-    # msvc is cl. clang-cl is the LLVM toolset that ships inside Visual Studio 2022. Same
-    # source, different optimiser, which is the whole question in #19.
-    [ValidateSet('msvc', 'clang-cl')][string]$Toolset = 'msvc',
 
     # def generates an export list from upstream's include/ada_c.h, exports only the ada_* C API,
     # and lets /GL back in. It is the default because it measured 7% faster on the hard URL path
@@ -143,13 +135,7 @@ if ($Exports -eq 'def') {
 # /GL, so MSBuild sets WholeProgramOptimization on the compile and LinkTimeCodeGeneration on the
 # link together. Setting one by hand and forgetting the other is LNK1257 at the end of a long
 # build.
-#
-# Off for clang-cl in every case. That MSBuild property drives cl's /GL and does nothing useful
-# for the LLVM toolset, whose LTO wants lld-link rather than link.exe. Thin LTO under clang-cl is
-# a separate experiment, not this one.
-$ipo = if ($Toolset -eq 'msvc' -and $Exports -eq 'def') { 'ON' } else { 'OFF' }
-
-if ($Toolset -eq 'clang-cl') { $injects += Join-Path $PSScriptRoot 'cmake/clang-cl-tweaks.cmake' }
+$ipo = if ($Exports -eq 'def') { 'ON' } else { 'OFF' }
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 
@@ -166,10 +152,8 @@ $cmakeArgs = @(
     "-DCMAKE_SHARED_LINKER_FLAGS_RELEASE=$linkFlags"
 )
 
-if ($Toolset -eq 'clang-cl') { $cmakeArgs += @('-T', 'ClangCL') }
-
-# CMAKE_PROJECT_TOP_LEVEL_INCLUDES runs our scripts straight after upstream's project() call,
-# which is how both variants change the ada target without a patch landing in the clone. A
+# CMAKE_PROJECT_TOP_LEVEL_INCLUDES runs our script straight after upstream's project() call,
+# which is how def mode turns WINDOWS_EXPORT_ALL_SYMBOLS off without a patch landing in the clone. A
 # patched clone would mean the artifact is no longer the pinned upstream tag, and the checksum
 # manifest and the SBOM both rest on it being exactly that.
 #
@@ -181,35 +165,19 @@ if ($injects.Count -gt 0) {
     if ($reported -notmatch '(\d+)\.(\d+)') { throw "could not read a version out of `"$reported`"" }
     $cmakeVersion = [version]"$($Matches[1]).$($Matches[2])"
     if ($cmakeVersion -lt [version]'3.24') {
-        throw "cmake $cmakeVersion is too old. -Toolset clang-cl and -Exports def both need CMAKE_PROJECT_TOP_LEVEL_INCLUDES, which is CMake 3.24 or later."
+        throw "cmake $cmakeVersion is too old. -Exports def needs CMAKE_PROJECT_TOP_LEVEL_INCLUDES, which is CMake 3.24 or later."
     }
 
     $list = ($injects | ForEach-Object { $_.Replace('\', '/') }) -join ';'
     $cmakeArgs += "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$list"
 }
 
-Write-Output "configuring $Rid with toolset=$Toolset exports=$Exports ipo=$ipo"
+Write-Output "configuring $Rid with exports=$Exports ipo=$ipo"
 
 cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed with exit code $LASTEXITCODE" }
 
-# clang-cl compiles, link.exe links.
-#
-# Two reasons. lld-link took /CETCOMPAT without a word and emitted no EX_DLLCHARACTERISTICS
-# record, so the clang-cl build compiled clean, exported everything, set all four
-# DllCharacteristics bits, and had no shadow stack support. verify-windows.ps1 caught it, twice.
-# And #19 is a question about the code generator, so swapping the linker at the same time as the
-# compiler would answer a different one.
-#
-# It has to be an MSBuild global property, passed on the command line after --, rather than
-# CMAKE_VS_GLOBALS. CMAKE_VS_GLOBALS writes into the vcxproj's Globals PropertyGroup, and
-# LLVM.Cpp.Common.props then sets `<UseLldLink>true</UseLldLink>` with no condition guarding it,
-# so a project level value is simply overwritten when those props import. A global property
-# cannot be overwritten by a PropertyGroup, which is the whole point of one.
-#
-# UseClangCl stays true, so this changes the linker and nothing else.
 $buildArgs = @('--build', $build, '--config', 'Release', '--parallel')
-if ($Toolset -eq 'clang-cl') { $buildArgs += @('--', '/p:UseLldLink=false') }
 
 cmake @buildArgs
 if ($LASTEXITCODE -ne 0) { throw "cmake build failed with exit code $LASTEXITCODE" }
