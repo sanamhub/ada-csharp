@@ -50,6 +50,7 @@ jobs:
           - { name: linux-arm64,    os: ubuntu-24.04-arm, container: '' }
           - { name: osx-arm64,      os: macos-14,         container: '' }
           - { name: win-x64,        os: windows-2022,     container: '' }
+          - { name: win-arm64,      os: windows-11-arm,   container: '' }
           - { name: linux-musl-x64, os: ubuntu-24.04,     container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
           # osx-x64 needs an Intel host, and macos-13 queues for tens of minutes. nightly.yml
           # covers it, where waiting costs nothing.

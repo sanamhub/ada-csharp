@@ -1,10 +1,18 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-    Builds Ada as a shared library for win-x64.
+    Builds Ada as a shared library for win-x64 or win-arm64.
 .DESCRIPTION
-    Baseline is x86-64-v2, not a static AVX2 build, so the artifact runs on any CPU from 2009
-    onward instead of raising the floor to Haswell.
+    On x64 the baseline is x86-64-v2, not a static AVX2 build, so the artifact runs on any CPU
+    from 2009 onward instead of raising the floor to Haswell. arm64 has no equivalent floor to
+    pick, so there is nothing to say there.
+
+    win-arm64 cross compiles from an x64 host with -A ARM64, so it needs no separate build
+    machine, only the ARM64 toolset installed alongside MSVC. /CETCOMPAT comes off, because CET
+    is x86 and x64 only and there is no arm64 equivalent to ask for. Everything else that
+    hardens the binary stays. The machine type of the output is checked by
+    native/verify-windows.ps1 rather than trusted, because a silently x64 binary shipped under
+    this RID would fail on exactly the machines the RID exists for.
 
     ADA_USE_SIMDUTF is OFF. With BUILD_SHARED_LIBS=ON it propagates to simdutf, and building
     simdutf as a DLL crashes cmake -E __create_def while generating exports.def. See ADR-0003.
@@ -18,7 +26,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$AdaTag,
-    [string]$Rid = 'win-x64',
+    [ValidateSet('win-x64', 'win-arm64')][string]$Rid = 'win-x64',
 
     # def generates an export list from upstream's include/ada_c.h, exports only the ada_* C API,
     # and lets /GL back in. It is the default because it measured 7% faster on the hard URL path
@@ -102,7 +110,8 @@ function New-AdaExportsDef {
 #
 # /OPT:REF and /OPT:ICF run either way.
 #
-# /guard:cf, /DYNAMICBASE, /HIGHENTROPYVA and /CETCOMPAT are required hardening.
+# /guard:cf, /DYNAMICBASE and /HIGHENTROPYVA are required hardening on both architectures.
+# /CETCOMPAT is x64 only and is added below.
 #
 # /Brepro is what makes the checksum manifest mean anything. By default MSVC stamps the PE header
 # with the build time and the debug directory with a fresh PDB signature, so two builds of
@@ -115,7 +124,13 @@ function New-AdaExportsDef {
 #
 # The five Unix RIDs already reproduce byte for byte with no extra flags.
 $cxxFlags  = '/O2 /Ob3 /Oi /Gy /Gw /EHsc /DNDEBUG /Zi /guard:cf /Brepro'
-$linkFlags = '/OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /GUARD:CF /DYNAMICBASE /HIGHENTROPYVA /CETCOMPAT /Brepro /PDBALTPATH:%_PDB%'
+$linkFlags = '/OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /GUARD:CF /DYNAMICBASE /HIGHENTROPYVA /Brepro /PDBALTPATH:%_PDB%'
+
+# CET shadow stacks are an x86 and x64 feature. link.exe accepts /CETCOMPAT on an arm64 target
+# and emits nothing, which is the failure verify-windows.ps1 was taught to catch, so do not pass
+# a flag whose only possible outcome here is a gate that has to be weakened to let it through.
+$arch = if ($Rid -eq 'win-arm64') { 'ARM64' } else { 'x64' }
+if ($arch -eq 'x64') { $linkFlags += ' /CETCOMPAT' }
 
 $injects = @()
 
@@ -140,7 +155,7 @@ $ipo = if ($Exports -eq 'def') { 'ON' } else { 'OFF' }
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 
 $cmakeArgs = @(
-    '-S', $src, '-B', $build, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+    '-S', $src, '-B', $build, '-G', 'Visual Studio 17 2022', '-A', $arch,
     '-DCMAKE_BUILD_TYPE=Release',
     '-DBUILD_SHARED_LIBS=ON',
     '-DADA_TESTING=OFF', '-DADA_BENCHMARKS=OFF', '-DADA_TOOLS=OFF',
@@ -172,7 +187,7 @@ if ($injects.Count -gt 0) {
     $cmakeArgs += "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$list"
 }
 
-Write-Output "configuring $Rid with exports=$Exports ipo=$ipo"
+Write-Output "configuring $Rid with arch=$arch exports=$Exports ipo=$ipo"
 
 cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed with exit code $LASTEXITCODE" }

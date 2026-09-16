@@ -54,8 +54,8 @@ a test rather than written by hand, so it cannot drift from what the parsers act
 dotnet add package Ada.Url
 ```
 
-Native binaries for `win-x64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`, `osx-x64` and
-`osx-arm64` ship inside the package. Nothing to install separately.
+Native binaries for `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`,
+`osx-x64` and `osx-arm64` ship inside the package. Nothing to install separately.
 
 ## Using it
 
@@ -298,7 +298,7 @@ the same suite browsers are held to, pinned at a known commit.
 | Setter behaviour | 278 | all pass |
 | **Total** | **1,152** | **all pass** |
 
-Verified on Linux x64, Linux arm64, macOS arm64 and Windows x64, every commit.
+Verified on Linux x64, Linux arm64, macOS arm64, Windows x64 and Windows arm64, every commit.
 
 The rejection row is the one worth noticing. Accepting a malformed URL is the failure mode that
 turns into a security bug, and it is the half of a specification that is easy to skip.

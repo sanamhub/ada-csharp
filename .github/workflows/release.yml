@@ -68,6 +68,7 @@ jobs:
           - { name: linux-x64,      os: ubuntu-24.04,     rid: linux-x64,      container: '' }
           - { name: linux-arm64,    os: ubuntu-24.04-arm, rid: linux-arm64,    container: '' }
           - { name: win-x64,        os: windows-2022,     rid: win-x64,        container: '' }
+          - { name: win-arm64,      os: windows-11-arm,   rid: win-arm64,      container: '' }
           - { name: osx-arm64,      os: macos-14,         rid: osx-arm64,      container: '' }
           # A glibc .so will not load on Alpine, so this leg is what proves the musl RID is real
           # rather than assumed. AC-2.5.

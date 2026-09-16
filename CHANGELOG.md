@@ -7,6 +7,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `win-arm64`. Native binaries for it ship in the package, the conformance suite runs on a
+  `windows-11-arm` runner, and the reproducibility check and the checksum manifest cover it. The
+  binary cross compiles from the x64 runner, so `native/verify-windows.ps1` now reads the PE
+  machine field and fails unless it matches the RID: an x64 binary shipped under `win-arm64`
+  would pass every other gate and then fail on exactly the machines the RID exists for.
+  `/CETCOMPAT` is not passed there, because CET is x86 and x64 only and the linker takes the flag
+  and emits nothing. ADR-0008.
+
 - Benchmark `W4` gained `ReuseHandleAndReadHostname`, which re-parses into one `AdaUrl` through
   `TrySetHref` instead of allocating a URL object per URL. It is the only lever the binding has
   over the native allocation and it is worth the most on Windows.

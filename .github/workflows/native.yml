@@ -19,6 +19,7 @@ on:
         type: string
         default: >-
           [{"rid":"win-x64","os":"windows-2022"},
+           {"rid":"win-arm64","os":"windows-2022"},
            {"rid":"linux-x64","os":"ubuntu-24.04"},
            {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
            {"rid":"linux-musl-x64","os":"ubuntu-24.04"},
@@ -46,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-14"}]') }}
+        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"win-arm64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v7
