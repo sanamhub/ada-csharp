@@ -55,9 +55,10 @@ Pull request CI grows a fifth native and a fifth test leg. The native build is c
 upstream tag and the hash of `native/`, so a pull request that does not touch the build scripts
 still pays for neither.
 
-`native/CHECKSUMS.txt` gains a line. Until the reproducibility check has run for this RID, that
-line is a hash from one build rather than a hash confirmed to repeat, which is the same position
-`win-x64` was in before `/Brepro` landed.
+`native/CHECKSUMS.txt` gains a line, and it is a hash confirmed to repeat rather than a hash from
+one build. `/Brepro` and `/PDBALTPATH:%_PDB%` carry over to arm64: two builds from scratch in one
+job produced `e73ed3ed` twice, and the `natives` run on a different machine produced the same
+bytes again.
 
 Signing does not cover it, because signing does not cover anything yet: `scripts/sign.ps1` is
 gated on a certificate that does not exist in the `production` environment. When one does, it
