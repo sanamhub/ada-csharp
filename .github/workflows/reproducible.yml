@@ -29,6 +29,7 @@ jobs:
       matrix:
         include:
           - { rid: win-x64,   os: windows-2022, lib: ada.dll   }
+          - { rid: win-arm64, os: windows-2022, lib: ada.dll   }
           - { rid: linux-x64, os: ubuntu-24.04, lib: libada.so }
     steps:
       - uses: actions/checkout@v7
@@ -43,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ matrix.rid }}" in
-            win-x64)   pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid win-x64 ;;
+            win-*)     pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid ${{ matrix.rid }} ;;
             linux-x64) ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 ;;
           esac
           mkdir -p /tmp/repro
@@ -57,7 +58,7 @@ jobs:
           # the second build repeats the clone as well as the compile.
           rm -rf native/build native/ada-src artifacts/native
           case "${{ matrix.rid }}" in
-            win-x64)   pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid win-x64 ;;
+            win-*)     pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid ${{ matrix.rid }} ;;
             linux-x64) ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 ;;
           esac
           cp "artifacts/native/${{ matrix.rid }}/${{ matrix.lib }}" /tmp/repro/second

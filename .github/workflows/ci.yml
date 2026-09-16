@@ -29,6 +29,7 @@ jobs:
     with:
       rids: >-
         [{"rid":"win-x64","os":"windows-2022"},
+         {"rid":"win-arm64","os":"windows-2022"},
          {"rid":"linux-x64","os":"ubuntu-24.04"},
          {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
          {"rid":"osx-arm64","os":"macos-14"}]
@@ -42,6 +43,10 @@ jobs:
       matrix:
         include:
           - { os: windows-2022,     rid: win-x64     }
+          # win-arm64 is cross compiled on the x64 runner, so this leg is the only place the
+          # binary is executed on the architecture it was built for. Without it the RID ships on
+          # the strength of a PE header field.
+          - { os: windows-11-arm,   rid: win-arm64   }
           - { os: ubuntu-24.04,     rid: linux-x64   }
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }
           - { os: macos-14,         rid: osx-arm64   }

@@ -12,7 +12,12 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory, Position = 0)][string]$ArtifactDir
+    [Parameter(Mandatory, Position = 0)][string]$ArtifactDir,
+
+    # Which architecture the artifact is supposed to be. Defaults to the last segment of the
+    # artifact directory, which is the RID at every call site, so callers do not have to repeat
+    # themselves and cannot forget. Pass it explicitly if the directory is named something else.
+    [ValidateSet('win-x64', 'win-arm64')][string]$Rid = (Split-Path -Leaf $ArtifactDir)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -109,6 +114,22 @@ if ([System.BitConverter]::ToUInt16($bytes, 0) -ne 0x5A4D) { throw 'not a PE fil
 $peOffset = [System.BitConverter]::ToInt32($bytes, 0x3C)
 if ([System.BitConverter]::ToUInt32($bytes, $peOffset) -ne 0x00004550) { throw 'not a PE file, no PE signature' }
 
+# --- Architecture ---------------------------------------------------------------------------
+# win-arm64 cross compiles from an x64 host, so the generator decides the target and a wrong -A,
+# a stale build directory or a cache key that missed would all produce an x64 binary sitting in
+# the win-arm64 artifact directory. It would pass every other check in this file and then fail
+# on exactly the machines that RID exists for. ADR-0003 calls out the same trap for osx-x64,
+# where lipo answers it; this is the PE equivalent.
+$expectedMachine = if ($Rid -eq 'win-arm64') { 0xAA64 } else { 0x8664 }
+$machine = [System.BitConverter]::ToUInt16($bytes, $peOffset + 4)
+
+if ($machine -ne $expectedMachine) {
+    Write-Error ('FAIL: {0} expects machine 0x{1:X4}, this binary is 0x{2:X4}' -f $Rid, $expectedMachine, $machine)
+    exit 1
+}
+
+Write-Output ('PASS: machine is 0x{0:X4}, which matches {1}' -f $machine, $Rid)
+
 # COFF header is 20 bytes, so the optional header starts 24 bytes past the signature.
 # DllCharacteristics sits at offset 0x46 in the optional header for both PE32 and PE32+.
 $optionalHeader = $peOffset + 24
@@ -143,10 +164,9 @@ Write-Output 'PASS: ASLR, high entropy VA, DEP and CFG all set'
 # A different toolset can take the flag and emit no record, and the artifact then ships with no
 # shadow stack support and nothing anywhere says so. Read the record.
 
-$machine = [System.BitConverter]::ToUInt16($bytes, $peOffset + 4)
-
 # /CETCOMPAT is x64 only. There is no arm64 equivalent to look for, so this is skipped rather
-# than failed for win-arm64.
+# than failed for win-arm64. The build does not pass the flag there either, so this is not a gate
+# being weakened to let something through: there is nothing to look for.
 if ($machine -ne 0x8664) {
     Write-Output ('SKIP: CET is x64 only, and this is machine 0x{0:X4}' -f $machine)
     exit 0
