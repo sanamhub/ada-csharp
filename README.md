@@ -55,7 +55,8 @@ dotnet add package Ada.Url
 ```
 
 Native binaries for `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `linux-musl-x64`,
-`osx-x64` and `osx-arm64` ship inside the package. Nothing to install separately.
+`linux-musl-arm64`, `osx-x64` and `osx-arm64` ship inside the package. Nothing to install
+separately.
 
 ## Using it
 

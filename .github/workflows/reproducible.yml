@@ -31,6 +31,7 @@ jobs:
           - { rid: win-x64,   os: windows-2022, lib: ada.dll   }
           - { rid: win-arm64, os: windows-2022, lib: ada.dll   }
           - { rid: linux-x64, os: ubuntu-24.04, lib: libada.so }
+          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, lib: libada.so }
     steps:
       - uses: actions/checkout@v7
 
@@ -46,6 +47,7 @@ jobs:
           case "${{ matrix.rid }}" in
             win-*)     pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid ${{ matrix.rid }} ;;
             linux-x64) ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 ;;
+            linux-musl-*) ./native/build-musl.sh --ada-tag v4.0.0 --rid ${{ matrix.rid }} ;;
           esac
           mkdir -p /tmp/repro
           cp "artifacts/native/${{ matrix.rid }}/${{ matrix.lib }}" /tmp/repro/first
@@ -60,6 +62,7 @@ jobs:
           case "${{ matrix.rid }}" in
             win-*)     pwsh ./native/build-windows.ps1 -AdaTag v4.0.0 -Rid ${{ matrix.rid }} ;;
             linux-x64) ./native/build-linux.sh --ada-tag v4.0.0 --rid linux-x64 ;;
+            linux-musl-*) ./native/build-musl.sh --ada-tag v4.0.0 --rid ${{ matrix.rid }} ;;
           esac
           cp "artifacts/native/${{ matrix.rid }}/${{ matrix.lib }}" /tmp/repro/second
 

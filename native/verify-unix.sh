@@ -8,7 +8,12 @@
 set -euo pipefail
 
 DIR="${1:-}"
-[ -n "$DIR" ] || { echo "usage: verify-unix.sh <artifact-dir>" >&2; exit 2; }
+[ -n "$DIR" ] || { echo "usage: verify-unix.sh <artifact-dir> [rid]" >&2; exit 2; }
+
+# Which architecture the artifact is supposed to be. Defaults to the last segment of the
+# artifact directory, which is the RID at every call site, so no caller has to repeat itself and
+# none of them can forget to ask.
+RID="${2:-$(basename "$DIR")}"
 
 LIB=""
 for candidate in "$DIR/libada.so" "$DIR/libada.dylib"; do
@@ -47,6 +52,27 @@ fi
 
 TOTAL="$(grep -cE '(^| )_?ada_' <<< "$SYMBOLS" || true)"
 echo "PASS: exports present, $TOTAL ada_* symbols total"
+
+# Architecture. The musl RIDs are built inside a container and the arm64 legs are cross cutting
+# enough that "the runner was arm64, so the output is arm64" is an assumption rather than a fact:
+# a docker image pinned to a single platform digest, or a QEMU binfmt handler quietly doing its
+# job, both produce a working .so for the wrong architecture. It would pass every other check
+# here and then fail on exactly the machines the RID exists for. macOS is covered by lipo in
+# native.yml, so this is the ELF half.
+if [ "${LIB##*.}" = "so" ]; then
+  case "$RID" in
+    linux-x64|linux-musl-x64)     WANT="Advanced Micro Devices X86-64" ;;
+    linux-arm64|linux-musl-arm64) WANT="AArch64" ;;
+    *) echo "FAIL: no expected machine type for rid '$RID'" >&2; exit 1 ;;
+  esac
+
+  GOT="$(readelf -hW "$LIB" | sed -n 's/^  Machine:  *//p')"
+  if [ "$GOT" != "$WANT" ]; then
+    echo "FAIL: $RID expects machine '$WANT', this binary is '$GOT'" >&2
+    exit 1
+  fi
+  echo "PASS: machine is '$GOT', which matches $RID"
+fi
 
 # Hardening. readelf is present on the Ubuntu runners, so no checksec dependency.
 if [ "${LIB##*.}" = "so" ]; then

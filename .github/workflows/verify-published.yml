@@ -4,7 +4,7 @@ name: verify published
 #
 # The release workflow already does this once, but inside the publish job, which runs on Windows
 # because code signing needs signtool. One platform is thin cover for a library whose whole
-# problem is shipping seven native binaries, and win-x64 is the least likely of them to fail.
+# problem is shipping eight native binaries, and win-x64 is the least likely of them to fail.
 #
 # Called by release.yml rather than triggered by the release event.
 #
@@ -52,6 +52,7 @@ jobs:
           - { name: win-x64,        os: windows-2022,     container: '' }
           - { name: win-arm64,      os: windows-11-arm,   container: '' }
           - { name: linux-musl-x64, os: ubuntu-24.04,     container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
+          - { name: linux-musl-arm64, os: ubuntu-24.04-arm, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
           # osx-x64 needs an Intel host, and macos-13 queues for tens of minutes. nightly.yml
           # covers it, where waiting costs nothing.
     steps:

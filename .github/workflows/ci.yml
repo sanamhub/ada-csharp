@@ -154,7 +154,7 @@ jobs:
 
       # AllowPartialNativePack is set here on purpose. A pull request builds four RIDs, so the
       # package is deliberately incomplete and this job is testing consumption rather than
-      # release readiness. The release workflow packs all seven with the gate active.
+      # release readiness. The release workflow packs all eight with the gate active.
       - name: pack
         run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out -p:AllowPartialNativePack=true
 

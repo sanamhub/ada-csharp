@@ -5,6 +5,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `linux-musl-arm64`. Alpine on arm64 got a `DllNotFoundException` for a reason that had nothing
+  to do with the caller's code. Built by the existing `build-musl.sh` on an arm64 runner, and the
+  consumption test runs in an Alpine container on arm64, so the library is loaded on the platform
+  it targets rather than assumed to work because it compiled. ADR-0009.
+
+### Fixed
+
+- The Alpine image was pinned to an amd64 image digest rather than to the multi-architecture
+  index. On an arm64 host docker either refuses that or runs it under emulation and produces an
+  x86-64 `.so` in the `linux-musl-arm64` directory. The pin is now the 3.20.0 index, which
+  resolves per host and keeps both musl RIDs on one Alpine release. The amd64 image inside it is
+  the one the old pin named, so `linux-musl-x64` is byte for byte unchanged.
+- `native/build-musl.sh` hands ownership of what it built back to the invoking user. The
+  container runs as root, so everything it wrote into the bind mount was root owned and the
+  runner user could not delete it. The reproducibility check does exactly that between its two
+  builds and failed with `Permission denied` on every file the first build produced. `apk` needs
+  root, so ownership is handed back on the way out rather than dropped on the way in.
+- `native/verify-unix.sh` checks the ELF machine type against the RID instead of trusting the
+  runner. A container built for one platform, or a QEMU binfmt handler doing its job quietly,
+  produces a library for the wrong architecture that passes exports, hardening and checksums, and
+  then fails on exactly the machines the RID exists for. ADR-0008 added the PE half of this for
+  `win-arm64`.
+
 ## [0.1.0] - 2026-09-17
 
 Out of beta. Nothing in the API changed to earn that: the surface has been stable since
