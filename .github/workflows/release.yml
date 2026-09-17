@@ -1,6 +1,6 @@
 name: release
 
-# Builds all six native libraries, packs, verifies the package by consuming it, and publishes.
+# Builds all seven native libraries, packs, verifies the package by consuming it, and publishes.
 #
 # Nothing here trusts a previous run. The natives are rebuilt from the pinned upstream tag, the
 # checksums are verified against the committed manifest, and the package is consumed from a
@@ -300,7 +300,7 @@ jobs:
             echo "### Verification"
             echo
             echo "- Attached: the package, its symbols, and a CycloneDX SBOM listing the native library."
-            echo "- The six native binaries are built from the pinned Ada tag in CI and their SHA-256"
+            echo "- The seven native binaries are built from the pinned Ada tag in CI and their SHA-256"
             echo "  checksums are matched against \`native/CHECKSUMS.txt\` before the package is pushed."
             echo "- Published with NuGet trusted publishing, so no long lived API key exists for this repository."
             echo
