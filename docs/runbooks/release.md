@@ -14,9 +14,9 @@
    without one stops the release, and every builds-are-not-reproducible workaround ends with
    somebody regenerating it on autopilot, which is exactly the habit an attacker relies on.
 
-   All six RIDs are reproducible: the same source and flags give byte identical output. The
-   `reproducible build` workflow builds win-x64 and linux-x64 twice from scratch every week and
-   fails if the two differ. Windows needs `/Brepro` and `/PDBALTPATH` for this, since MSVC
+   All seven RIDs are reproducible: the same source and flags give byte identical output. The
+   `reproducible build` workflow builds win-x64, win-arm64 and linux-x64 twice from scratch every
+   week and fails if the two differ. Windows needs `/Brepro` and `/PDBALTPATH` for this, since MSVC
    otherwise stamps the build time and a fresh PDB signature into every binary.
 4. `PublicAPI.Unshipped.txt` entries are moved to `PublicAPI.Shipped.txt` for a stable release.
 5. CI is green on `main`.
@@ -36,7 +36,7 @@ That triggers `release.yml`:
 | Job | What it does |
 | --- | --- |
 | `preflight` | Checks the tag, the project version and the changelog agree. Seconds. |
-| `natives` | Builds all six native libraries from the pinned upstream Ada tag. |
+| `natives` | Builds all seven native libraries from the pinned upstream Ada tag. |
 | `verify` | Packs with the completeness gate active and consumes the package from a clean project on five platforms, Alpine included. |
 | `publish` | Waits on the `production` environment approval, then verifies checksums, packs, builds the SBOM, pushes to nuget.org, and creates the GitHub release. |
 | `verify published` | Called by `release.yml` after `publish`. Waits for nuget.org validation, then installs the package from the live feed on five platforms. |

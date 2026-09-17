@@ -20,9 +20,9 @@ Encoding.UTF8.GetString(url.Href);      // https://example.org/file.txt
 Encoding.UTF8.GetString(url.Hostname);  // example.org
 ```
 
-> **0.1.0-beta.1.** The conformance suite passes in full on four platforms and the package is
-> verified by installing it into a clean project. The public API has had no outside use yet, so
-> it may still move before 1.0.
+> **0.1.0.** The conformance suite passes in full on five platforms and the package is verified
+> by installing it into a clean project on each. The public API is considered done and has not
+> moved since the first beta. This is still `0.x`, so under SemVer a minor bump may break it.
 
 ## Why not `System.Uri`
 

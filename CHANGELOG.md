@@ -5,6 +5,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-17
+
+Out of beta. Nothing in the API changed to earn that: the surface has been stable since
+0.1.0-beta.1 and moves to `PublicAPI.Shipped.txt` unchanged. What changed is that the questions
+the beta was holding open have answers.
+
+`0.1.0-beta.1` said beta because the API "may still move". It has not, through two betas. The
+Windows performance gap was the other open question and it is measured now, in ADR-0006 and
+ADR-0007, rather than explained by a guess this file used to print as fact.
+
+This is still `0.x`. Under SemVer that means a minor bump may break the API, so the promise here
+is that the surface is considered done, not that it is frozen.
+
 ### Added
 
 - `win-arm64`. Native binaries for it ship in the package, the conformance suite runs on a
