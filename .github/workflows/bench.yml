@@ -42,6 +42,7 @@ jobs:
         [{"rid":"linux-x64","os":"ubuntu-24.04"},
          {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
          {"rid":"win-x64","os":"windows-2022"},
+         {"rid":"win-arm64","os":"windows-2022"},
          {"rid":"osx-arm64","os":"macos-14"}]
 
   run:
@@ -55,6 +56,9 @@ jobs:
           - { rid: linux-x64,   os: ubuntu-24.04,     arch: 'x64, Linux, GitHub hosted' }
           - { rid: linux-arm64, os: ubuntu-24.04-arm, arch: 'arm64, Linux, GitHub hosted' }
           - { rid: win-x64,     os: windows-2022,     arch: 'x64, Windows, GitHub hosted' }
+          # Cross compiled on the x64 runner, so this is the only place the arm64 binary is
+          # measured on the architecture it was built for.
+          - { rid: win-arm64,   os: windows-11-arm,   arch: 'arm64, Windows, GitHub hosted' }
           - { rid: osx-arm64,   os: macos-14,         arch: 'arm64, Apple Silicon, GitHub hosted' }
     steps:
       - uses: actions/checkout@v7
