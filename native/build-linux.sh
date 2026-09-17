@@ -32,7 +32,7 @@ case "$RID" in
     ARCH_FLAGS="-march=x86-64-v2 -mtune=generic"
     CFI_FLAGS="-fcf-protection=full"
     ;;
-  linux-arm64)
+  linux-arm64|linux-musl-arm64)
     ARCH_FLAGS="-march=armv8-a+crc+crypto -mtune=neoverse-n1"
     CFI_FLAGS="-mbranch-protection=standard"
     ;;

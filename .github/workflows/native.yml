@@ -23,6 +23,7 @@ on:
            {"rid":"linux-x64","os":"ubuntu-24.04"},
            {"rid":"linux-arm64","os":"ubuntu-24.04-arm"},
            {"rid":"linux-musl-x64","os":"ubuntu-24.04"},
+           {"rid":"linux-musl-arm64","os":"ubuntu-24.04-arm"},
            {"rid":"osx-x64","os":"macos-14"},
            {"rid":"osx-arm64","os":"macos-14"}]
     secrets:
@@ -47,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"win-arm64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-14"}]') }}
+        include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"win-arm64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"linux-musl-arm64","os":"ubuntu-24.04-arm"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
       # TODO: pin these to full commit SHAs before the first release.
       - uses: actions/checkout@v7
@@ -94,7 +95,7 @@ jobs:
         shell: bash
         run: |
           case "${{ matrix.rid }}" in
-            linux-musl-x64) ./native/build-musl.sh  --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
+            linux-musl-*)   ./native/build-musl.sh  --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
             linux-*)        ./native/build-linux.sh --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
             osx-*)          ./native/build-macos.sh --ada-tag "$ADA_TAG" --rid "${{ matrix.rid }}" ;;
           esac
@@ -126,7 +127,7 @@ jobs:
       - name: verify exports and hardening (unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: ./native/verify-unix.sh artifacts/native/${{ matrix.rid }}
+        run: ./native/verify-unix.sh artifacts/native/${{ matrix.rid }} ${{ matrix.rid }}
 
       - name: verify exports and hardening (windows)
         if: runner.os == 'Windows'

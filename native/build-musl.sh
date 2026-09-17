@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Builds the linux-musl-x64 native inside Alpine.
+# Builds a musl native inside Alpine, for linux-musl-x64 or linux-musl-arm64.
 #
-# This RID is not optional. A glibc .so will not load on Alpine, and containers are a first
-# class target for this package.
+# These RIDs are not optional. A glibc .so will not load on Alpine, and containers are a first
+# class target for this package. arm64 containers are no longer unusual, so the same argument
+# that bought linux-musl-x64 buys this one.
 set -euo pipefail
 
 ADA_TAG=""
@@ -21,7 +22,17 @@ done
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Pinned by digest, not by tag, so the toolchain cannot change under us between runs.
-ALPINE="alpine:3.20@sha256:216266c86fc4dcef5619930bd394245824c2af52fd21ba7c6fa0e618657d4c3b"
+#
+# This is the digest of the 3.20.0 multi-architecture index, not of one image inside it. The
+# previous pin was the amd64 image directly, which is a single platform manifest: on an arm64
+# host docker would refuse it, or silently run it under emulation and produce an x86-64 .so
+# sitting in the linux-musl-arm64 directory. The index resolves to the right image per host and
+# both come from the same Alpine release, so the two musl RIDs cannot drift apart by a patch
+# level either.
+#
+# The amd64 image inside this index is sha256:216266c8, which is exactly what the old pin named,
+# so linux-musl-x64 is byte for byte unchanged by this.
+ALPINE="alpine:3.20@sha256:77726ef6b57ddf65bb551896826ec38bc3e53f75cdde31354fbffb4f25238ebd"
 
 docker run --rm -v "$ROOT:/w" -w /w "$ALPINE" sh -c "
   set -eu
