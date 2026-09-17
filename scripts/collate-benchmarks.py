@@ -26,12 +26,13 @@ import shutil
 import sys
 
 # Order matters: this is the order platforms appear in the summary columns.
-PLATFORMS = ["linux-x64", "linux-arm64", "win-x64", "osx-arm64"]
+PLATFORMS = ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-arm64"]
 
 PLATFORM_LABEL = {
     "linux-x64": "Linux x64",
     "linux-arm64": "Linux arm64",
     "win-x64": "Windows x64",
+    "win-arm64": "Windows arm64",
     "osx-arm64": "macOS arm64",
 }
 
@@ -41,6 +42,17 @@ FIXED_COLUMNS = {
     "Min", "Max", "Op/s", "Ratio", "RatioSD", "MedianRatio", "Gen0", "Gen1", "Gen2",
     "Allocated", "Alloc Ratio", "Baseline", "Rank",
 }
+
+
+def unknown_rids(root: pathlib.Path) -> list[str]:
+    """RIDs that ran but this script has never heard of.
+
+    The list above is hand maintained, and a RID added to bench.yml but not to it is dropped
+    without a word: the run is green, the summary is complete looking, and one platform is
+    simply absent. That is how win-arm64's first results were lost. Name them and fail.
+    """
+    found = {d.name[len("benchmark-"):] for d in root.glob("benchmark-*") if d.is_dir()}
+    return sorted(found - set(PLATFORMS))
 
 
 def parse_markdown(path: pathlib.Path) -> list[dict]:
@@ -112,18 +124,47 @@ def param_columns(rows: list[dict]) -> list[str]:
     seen: list[str] = []
     for row in rows:
         for key in row:
-            if key not in FIXED_COLUMNS and key not in seen and key:
+            if key not in FIXED_COLUMNS and key not in seen and key and not key.startswith("__"):
                 seen.append(key)
     return seen
 
 
+def mark_baselines(rows: list[dict], params: list[str]) -> None:
+    """Decide which rows are the baseline of their group, and say so on the row.
+
+    Reading it off Ratio == 1.00 is what this did first, and it is wrong: a row that measures
+    within half a percent of the baseline prints 1.00 as well. Two real Ada rows on Windows x64
+    were published as the baseline of their group that way, which reads as no measurement at all.
+
+    BenchmarkDotNet emits a Baseline column only when the config asks for it, which Program.cs
+    now does. Older exports have no such column, so fall back to Ratio, and take it only when
+    exactly one row in the group claims 1.00. A tie means the export cannot answer the question,
+    and printing the number is better than guessing which row it belongs to.
+    """
+    groups: dict[tuple, list[dict]] = {}
+    for row in rows:
+        key = (row.get("Categories") or row.get("Type") or "other",) + tuple(
+            row.get(p, "") for p in params
+        )
+        groups.setdefault(key, []).append(row)
+
+    for group in groups.values():
+        declared = [r for r in group if (r.get("Baseline") or "").strip() in ("Yes", "True")]
+        if declared:
+            chosen = declared
+        else:
+            at_one = [r for r in group if (r.get("Ratio") or "").strip() in ("1.00", "1.0", "1")]
+            chosen = at_one if len(at_one) == 1 else []
+        for row in chosen:
+            row["__baseline"] = True
+
+
 def ratio_and_bytes(row: dict) -> tuple[str, str]:
     raw_ratio = (row.get("Ratio") or "").strip()
-    if raw_ratio in ("", "?", "NA"):
-        ratio = "n/a"
-    elif raw_ratio in ("1.00", "1.0", "1"):
-        # BenchmarkDotNet prints the baseline as exactly 1.00.
+    if row.get("__baseline"):
         ratio = "baseline"
+    elif raw_ratio in ("", "?", "NA"):
+        ratio = "n/a"
     else:
         ratio = f"{raw_ratio}x"
 
@@ -159,6 +200,9 @@ def write_summary(reports: dict[str, list[dict]], out_dir: pathlib.Path) -> None
         return
 
     params = param_columns([r for rid in present for r in reports[rid]])
+
+    for rid in present:
+        mark_baselines(reports[rid], params)
 
     # Group by category so W1, W2, W3 and W4 read as separate questions rather than one list.
     by_category: dict[str, list[str]] = {}
@@ -224,6 +268,15 @@ def main() -> int:
     root = pathlib.Path(sys.argv[1])
     out_dir = pathlib.Path(sys.argv[2])
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    stray = unknown_rids(root)
+    if stray:
+        print(
+            f"::error::results for {', '.join(stray)} were produced but are not in PLATFORMS, "
+            "so they would be dropped from the summary",
+            file=sys.stderr,
+        )
+        return 1
 
     reports = load_reports(root)
 
