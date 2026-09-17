@@ -12,6 +12,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   consumption test runs in an Alpine container on arm64, so the library is loaded on the platform
   it targets rather than assumed to work because it compiled. ADR-0009.
 
+### Changed
+
+- The recorded `win-arm64` checksum changes from `e73ed3ed` to `b13434aa`. Not a rebuild on
+  autopilot: the binary genuinely changed when the GitHub runner image rolled from
+  `20260907.297.1` to `20260913.307.1`, with the same `cl.exe` 19.44.35228.0 and the same Windows
+  SDK 10.0.26100.0 in both, and 14,980 bytes differ across the code section rather than in a
+  header. `win-x64` rebuilt on the same new image and did not move. Why the arm64 output tracks
+  the image is #45, which also records that ADR-0008 overstated the evidence for this RID being
+  reproducible.
+
 ### Fixed
 
 - The Alpine image was pinned to an amd64 image digest rather than to the multi-architecture
@@ -19,6 +29,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   x86-64 `.so` in the `linux-musl-arm64` directory. The pin is now the 3.20.0 index, which
   resolves per host and keeps both musl RIDs on one Alpine release. The amd64 image inside it is
   the one the old pin named, so `linux-musl-x64` is byte for byte unchanged.
+- `native/build-musl.sh` hands ownership of what it built back to the invoking user. The
+  container runs as root, so everything it wrote into the bind mount was root owned and the
+  runner user could not delete it. The reproducibility check does exactly that between its two
+  builds and failed with `Permission denied` on every file the first build produced. `apk` needs
+  root, so ownership is handed back on the way out rather than dropped on the way in.
 - `native/verify-unix.sh` checks the ELF machine type against the RID instead of trusting the
   runner. A container built for one platform, or a QEMU binfmt handler doing its job quietly,
   produces a library for the wrong architecture that passes exports, hardening and checksums, and

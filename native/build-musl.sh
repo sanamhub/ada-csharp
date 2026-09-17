@@ -34,9 +34,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # so linux-musl-x64 is byte for byte unchanged by this.
 ALPINE="alpine:3.20@sha256:77726ef6b57ddf65bb551896826ec38bc3e53f75cdde31354fbffb4f25238ebd"
 
+# The container runs as root, so everything it writes into the bind mount is root owned and the
+# runner user cannot delete it afterwards. That is not theoretical: the reproducibility check
+# removes native/build, native/ada-src and artifacts/native between its two builds, and it failed
+# with "Permission denied" on every file the first build had produced.
+#
+# apk needs root, so the fix is to hand ownership back on the way out rather than to drop
+# privileges on the way in. $(id -u) expands on the host, which is the whole point.
 docker run --rm -v "$ROOT:/w" -w /w "$ALPINE" sh -c "
   set -eu
   # bash is not in the Alpine base image and build-linux.sh needs it.
   apk add --no-cache bash build-base clang lld binutils cmake ninja git python3
   ./native/build-linux.sh --ada-tag '$ADA_TAG' --rid '$RID'
+  chown -R $(id -u):$(id -g) /w/native /w/artifacts
 "
