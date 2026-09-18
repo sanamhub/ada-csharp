@@ -1,0 +1,106 @@
+name: win-drift
+
+# Answers #45: the Windows natives produce one of two binaries depending on which runner image
+# the job lands on, with cl.exe and the Windows SDK reporting the same version on both.
+#
+# Two questions, one job.
+#
+#   What actually differs between the images? The version strings match, so whatever moved is
+#   below them. cl /Bv names the compiler back end DLLs individually, and the toolset and SDK
+#   directory names carry the patch level that cl -v does not print.
+#
+#   Is /GL the cause? MSVC partitions link time code generation across threads and the
+#   partitioning can depend on the machine, which would survive a fixed compiler version. So each
+#   RID is built twice, once with whole program optimisation and once without.
+#
+# All four builds run in one job on purpose. A matrix would spread them over runners, and during
+# a rollout that means different images, which is the exact variable being measured.
+#
+# The runner image cannot be chosen, so this is sampling rather than an experiment: dispatch it
+# until both images have been seen. The summary prints one row per build for that reason.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ada-tag:
+        description: 'Ada release tag to build'
+        default: 'v4.0.0'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sample:
+    name: sample
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: record the toolchain below the version strings
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $image = "$env:ImageVersion"
+          "runner image: $image"
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -property installationPath
+          "visual studio: $vs"
+          "vs version:    $(& $vswhere -latest -products '*' -property installationVersion)"
+
+          # The toolset directory name is the patch level. cl -v prints 19.44.35228.0 on both
+          # images; if the directories differ, that is the answer.
+          "msvc toolsets:"
+          Get-ChildItem "$vs\VC\Tools\MSVC" -Name | ForEach-Object { "  $_" }
+
+          "windows sdks:"
+          Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Name -Directory |
+            Where-Object { $_ -like '10.*' } | ForEach-Object { "  $_" }
+
+          "cmake: $((cmake --version)[0])"
+
+      # cl /Bv names c1.dll, c1xx.dll, c2.dll and link.exe with a version each. That is the
+      # finest grained identity the toolchain offers, and it is the thing cl -v hides.
+      - name: cl /Bv
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat" >nul
+          echo === cl /Bv ===
+          cl /Bv 2>&1
+          echo === link version ===
+          link 2>&1 | findstr /C:"Microsoft (R) Incremental Linker"
+
+      - name: build every combination
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $rows = @()
+          foreach ($rid in @('win-x64', 'win-arm64')) {
+            foreach ($ipo in @('on', 'off')) {
+              Remove-Item -Recurse -Force native/build, native/ada-src, artifacts/native -ErrorAction SilentlyContinue
+              ./native/build-windows.ps1 -AdaTag '${{ inputs.ada-tag }}' -Rid $rid -Ipo $ipo
+              $dll = "artifacts/native/$rid/ada.dll"
+              $sha = (Get-FileHash $dll -Algorithm SHA256).Hash.ToLower()
+              $size = (Get-Item $dll).Length
+              $rows += [pscustomobject]@{ rid = $rid; ipo = $ipo; sha256 = $sha; bytes = $size }
+            }
+          }
+
+          $image = "$env:ImageVersion"
+          "| runner image | rid | ipo | bytes | sha256 |"          | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "| --- | --- | --- | ---: | --- |"                        | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          foreach ($r in $rows) {
+            "| ``$image`` | $($r.rid) | $($r.ipo) | $($r.bytes) | ``$($r.sha256)`` |" |
+              Out-File -Append $env:GITHUB_STEP_SUMMARY
+            "$($r.sha256)  $image  $($r.rid)  ipo=$($r.ipo)"
+          }
+
+          $rows | ConvertTo-Json | Out-File -Encoding utf8 drift.json
+          "image=$image" | Out-File -Encoding utf8 -Append drift.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: drift-${{ github.run_attempt }}-${{ github.run_id }}
+          path: drift.json
+          retention-days: 90
