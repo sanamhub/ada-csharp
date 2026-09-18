@@ -1,0 +1,141 @@
+name: c-linkage-check
+
+# Answers #21 with a compiler rather than an argument.
+#
+# ada_c.h declares the whole C API with no linkage guard of its own. Include it from C++ and every
+# ada_* function is declared with C++ linkage, so the call mangles and nothing links against a
+# library that exported the C names. native/bench/alloc-probe.cpp works around it with its own
+# extern "C" wrapper, and that wrapper is the thing this check exists to let us delete.
+#
+# Two refs, same compiler, same translation unit. The baseline is expected to mangle and the
+# candidate is expected not to. A check that only ever ran against the fix would pass just as
+# happily if it were measuring nothing, so the baseline is part of the test, not context.
+#
+# Compile only. Linking would need a built library and adds nothing: the symbol the object file
+# asks for is the entire question.
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline-repo:
+        description: 'Repository expected to still have the problem'
+        default: 'ada-url/ada'
+        type: string
+      baseline-ref:
+        description: 'Ref in the baseline repository'
+        default: 'v4.0.0'
+        type: string
+      candidate-repo:
+        description: 'Repository carrying the fix'
+        default: 'sanamhub/ada'
+        type: string
+      candidate-ref:
+        description: 'Ref in the candidate repository'
+        default: 'c-api-extern-c'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  linkage:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - name: write the probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No extern "C" wrapper on purpose. That wrapper is what the fix is supposed to make
+          # unnecessary, so putting one here would hide the result.
+          cat > probe.cpp <<'CPP'
+          #include "ada_c.h"
+
+          bool probe(const char* input, size_t length) {
+            return ada_can_parse(input, length);
+          }
+          CPP
+          cat probe.cpp
+
+      - name: clone both refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch '${{ inputs.baseline-ref }}' \
+            "https://github.com/${{ inputs.baseline-repo }}.git" baseline
+          git clone --depth 1 --branch '${{ inputs.candidate-ref }}' \
+            "https://github.com/${{ inputs.candidate-repo }}.git" candidate
+          echo "baseline  ${{ inputs.baseline-repo }}@${{ inputs.baseline-ref }}  $(git -C baseline rev-parse --short HEAD)"
+          echo "candidate ${{ inputs.candidate-repo }}@${{ inputs.candidate-ref }}  $(git -C candidate rev-parse --short HEAD)"
+          echo "--- the only difference that matters ---"
+          diff -u baseline/include/ada_c.h candidate/include/ada_c.h || true
+
+      # cl is not on PATH in a bash step on windows-2022. Export what vcvars64 sets rather than
+      # running the compile from cmd, so the comparison below stays in one place for both OSes.
+      - name: put MSVC on PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = & $vswhere -latest -products * -property installationPath
+          $vcvars = Join-Path $vs 'VC/Auxiliary/Build/vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+
+          # cmd resolves the forward slashes in the path itself, but only for a quoted argument.
+          cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+            if ($_ -match '^(PATH|INCLUDE|LIB|LIBPATH)=(.*)$') {
+              "$($Matches[1])=$($Matches[2])" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+            }
+          }
+
+      - name: compile against each and read the symbol back
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # MSVC options are given with a leading dash, not a slash. Under bash on Windows a
+          # leading slash is a path and gets rewritten into something the compiler will not
+          # recognise. cl accepts both spellings.
+          symbol_for() {
+            local tree="$1"
+            if [ "${{ runner.os }}" = "Windows" ]; then
+              cl -nologo -c -std:c++20 -EHsc "-I$tree/include" probe.cpp "-Fo$tree.obj" >/dev/null
+              dumpbin -symbols "$tree.obj" | grep -o 'ada_can_parse[^ ]*' | head -1
+            else
+              g++ -c -std=c++20 -I "$tree/include" probe.cpp -o "$tree.o"
+              nm -u "$tree.o" | grep -o '[_A-Za-z0-9]*ada_can_parse[_A-Za-z0-9]*' | head -1
+            fi
+          }
+
+          base="$(symbol_for baseline || true)"
+          cand="$(symbol_for candidate || true)"
+
+          echo "baseline  symbol: ${base:-<none>}"
+          echo "candidate symbol: ${cand:-<none>}"
+
+          {
+            echo "| ref | undefined symbol for \`ada_can_parse\` |"
+            echo "| --- | --- |"
+            echo "| \`${{ inputs.baseline-repo }}@${{ inputs.baseline-ref }}\` | \`${base:-<none>}\` |"
+            echo "| \`${{ inputs.candidate-repo }}@${{ inputs.candidate-ref }}\` | \`${cand:-<none>}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          fail=0
+
+          # C linkage means the symbol is the function name, give or take a leading underscore
+          # that some targets add to every C symbol. Anything else carries a signature in it.
+          if [ "$cand" != "ada_can_parse" ] && [ "$cand" != "_ada_can_parse" ]; then
+            echo "::error::candidate still mangles ada_can_parse as '${cand:-<none>}', so the fix did not take"
+            fail=1
+          fi
+
+          if [ "$base" = "ada_can_parse" ] || [ "$base" = "_ada_can_parse" ]; then
+            echo "::error::baseline already has C linkage, so this check proves nothing. Upstream may have fixed it: drop the extern C wrapper in native/bench/alloc-probe.cpp and retire this workflow."
+            fail=1
+          fi
+
+          exit $fail
