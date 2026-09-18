@@ -194,8 +194,9 @@ foreach (byte[] next in urls)
 
 27% on Windows, 8% on Linux. Unlike every other table on this page those two rows are native
 measurements from `native/bench/alloc-probe.cpp`, not the managed benchmark, so do not line them
-up against the nanoseconds above. Benchmark `W4` now measures the same thing through the binding
-and the next results run will carry it. It is worth nothing on a hard URL, 1,741 ns against 1,771, because
+up against the nanoseconds above. Benchmark `W4` measures the same thing through the binding:
+on Windows x64 a reused handle costs 2.48x to 2.78x a validation where a fresh parse costs
+2.88x to 3.11x, in [`docs/benchmarks/0.1.0/`](docs/benchmarks/0.1.0/). It is worth nothing on a hard URL, 1,741 ns against 1,771, because
 `set_href` still allocates four times there and the IDNA work dominates either way. So this is
 for high volume loops over ordinary URLs, not a blanket recommendation.
 
@@ -238,12 +239,15 @@ and no frequency guarantee, and your hardware is not this hardware.
 
 The two parsers do not implement the same specification, so speed is only half of the comparison.
 If speed is what you are here for and you deploy on Windows, benchmark your own traffic before
-switching. The honest summary for Windows today: level with `System.Uri` on a plain URL, a few
-percent ahead on a hard one, no garbage either way, different specification.
+switching. The honest summary for Windows x64 in 0.1.0: about 12 percent ahead of `System.Uri`
+on a plain URL through the span path, level on a hard one, no garbage either way, different
+specification. Generating the export list and compiling with `/GL` is worth about 10 percent of
+that on a hard URL. The plain URL figure improved against 0.1.0-beta.1 as well, but Linux
+improved more on the same row with no build change at all, so read that one as the runner.
 
-Full results for all four platforms, the thousand URL batch workload and the UTF-16 transcode
-cost by input length are in
-[`docs/benchmarks/0.1.0-beta.1/`](docs/benchmarks/0.1.0-beta.1/). Those pages print raw
+Full results for all five benchmarked platforms, the thousand URL batch workload and the UTF-16
+transcode cost by input length are in
+[`docs/benchmarks/0.1.0/`](docs/benchmarks/0.1.0/). Those pages print raw
 BenchmarkDotNet output, where the `Ratio` column is the inverse of the speedups here and lower is
 faster: `0.52x` there is `1.9x` on this page. Reproduce any of it with
 `dotnet run -c Release --project benchmarks/Ada.Url.Benchmarks`.

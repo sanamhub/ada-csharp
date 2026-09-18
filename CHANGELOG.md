@@ -7,6 +7,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Published benchmark results for 0.1.0, in `docs/benchmarks/0.1.0/`, covering the five platforms
+  with a hosted runner. Every native in the run was a cache hit whose sha256 matches
+  `native/CHECKSUMS.txt`, so the numbers describe the released bytes rather than a rebuild.
+  Windows arm64 is measured for the first time. The export list and `/GL` change from ADR-0006
+  shows up as 10 percent on W2, flat on Linux over the same pair of runs, which is the control
+  that makes it attributable. W1 improved on Windows too, but improved further on Linux with no
+  build change, so the page credits that to the runner rather than to the optimisation.
 - `linux-musl-arm64`. Alpine on arm64 got a `DllNotFoundException` for a reason that had nothing
   to do with the caller's code. Built by the existing `build-musl.sh` on an arm64 runner, and the
   consumption test runs in an Alpine container on arm64, so the library is loaded on the platform
@@ -14,6 +21,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `scripts/collate-benchmarks.py` no longer drops a platform without saying so. Its platform list
+  is hand maintained, `win-arm64` was added to `bench.yml` and not to it, and the result was a
+  green run and a summary that simply had no Windows arm64 column. It now fails when a
+  `benchmark-<rid>` artifact arrives for a RID it does not know.
+- `scripts/collate-benchmarks.py` no longer labels a measured row as the baseline of its group.
+  It read the baseline off `Ratio` being `1.00`, which a row that lands within half a percent of
+  the baseline also prints. Two real Windows x64 rows in this run did exactly that, 158.90 ns
+  against 158.15 ns. `Program.cs` now asks BenchmarkDotNet for its `Baseline` column, and the
+  script prefers it, falling back to `Ratio` only where a single row in the group claims `1.00`.
 - The Alpine image was pinned to an amd64 image digest rather than to the multi-architecture
   index. On an arm64 host docker either refuses that or runs it under emulation and produces an
   x86-64 `.so` in the `linux-musl-arm64` directory. The pin is now the 3.20.0 index, which
