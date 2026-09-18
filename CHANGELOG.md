@@ -19,6 +19,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   consumption test runs in an Alpine container on arm64, so the library is loaded on the platform
   it targets rather than assumed to work because it compiled. ADR-0009.
 
+### Changed
+
+- `native/build-windows.ps1` takes `-Ipo auto|on|off`. `auto` is the previous behaviour and is
+  what ships, so no released binary changes. The override exists because whole program
+  optimisation was tied to `-Exports`, and the question in #45 needs `def` exports with `/GL` off,
+  which that coupling could not express. `all-symbols` with `/GL` is refused up front, since it
+  dies in `cmake -E __create_def` on IL objects.
+- `win-perf-experiment.yml` gains variant `c`, a pure `/GL` comparison, and a RID input so
+  `win-arm64` can be measured on `windows-11-arm`. Variant `a` moves exports and `/GL` together,
+  so #18's 7 percent covers the pair rather than `/GL` alone.
+
 ### Fixed
 
 - `scripts/collate-benchmarks.py` no longer drops a platform without saying so. Its platform list
