@@ -14,10 +14,24 @@
    without one stops the release, and every builds-are-not-reproducible workaround ends with
    somebody regenerating it on autopilot, which is exactly the habit an attacker relies on.
 
-   All seven RIDs are reproducible: the same source and flags give byte identical output. The
-   `reproducible build` workflow builds win-x64, win-arm64 and linux-x64 twice from scratch every
-   week and fails if the two differ. Windows needs `/Brepro` and `/PDBALTPATH` for this, since MSVC
-   otherwise stamps the build time and a fresh PDB signature into every binary.
+   The Linux and macOS RIDs are reproducible: the same source and flags give byte identical
+   output. The `reproducible build` workflow checks `linux-x64` and `linux-musl-arm64` weekly by
+   building each twice from scratch, as samples rather than as full coverage. Windows needs
+   `/Brepro` and `/PDBALTPATH` to get that far, since MSVC otherwise stamps the build time and a
+   fresh PDB signature into every binary.
+
+   **The two Windows RIDs are not reproducible across runner images, and the manifest does not
+   currently gate them.** `/GL` and `/LTCG` make MSVC produce different output on different GitHub
+   runner images from identical source and identical compiler versions. See ADR-0010. So a Windows
+   checksum mismatch has two possible causes and they look the same.
+
+   If a Windows checksum fails, read the runner image version out of the failing job before
+   touching this file. If it differs from the image that produced the committed hash, that is the
+   known problem and not a substitution. If it is the same image, stop and treat it as a real
+   mismatch, because the output is stable within an image.
+
+   `reproducible build` cannot see this: it builds twice inside one job on one machine, so it
+   catches embedded timestamps and nothing about images.
 4. `PublicAPI.Unshipped.txt` entries are moved to `PublicAPI.Shipped.txt` for a stable release.
 5. CI is green on `main`.
 
