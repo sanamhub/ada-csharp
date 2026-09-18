@@ -4,66 +4,63 @@ Run on GitHub hosted runners on 2026-09-17, Ada v4.0.0, five platforms.
 
 ## Read this first
 
-**These are the binaries that shipped.** Every native in this run was a cache hit, and the
-sha256 of all five matches [`native/CHECKSUMS.txt`](../../../native/CHECKSUMS.txt) as released.
-Nothing here was measured against a rebuild.
+**Ratios compare against `System.Uri` in the same process on the same machine.** Lower is faster,
+so `0.50x` is twice as fast. That is what makes the columns comparable between platforms.
+Absolute nanoseconds are not: shared runners have noisy neighbours and no frequency guarantee.
 
-**Ratios compare against `System.Uri` in the same process on the same machine**, so they are
-fair on every platform and comparable between platforms. Lower is faster. A ratio of `0.50x`
-means half the time, so twice as fast.
+**These are the binaries that shipped.** Every native in the run was a cache hit whose sha256
+matches [`native/CHECKSUMS.txt`](../../../native/CHECKSUMS.txt) as released.
 
 **The two parsers do not implement the same specification.** Ada follows WHATWG, `System.Uri`
-follows RFC 3986 and 3987 plus a decade of .NET specific behaviour. They disagree on real
-inputs, so speed is only half the comparison. See
-[`docs/system-uri-differences.md`](../../system-uri-differences.md).
-
-**Absolute nanoseconds are indicative only.** Shared runners have noisy neighbours and no
-frequency guarantee. Per platform detail is linked at the end.
+follows RFC 3986 and 3987 plus a decade of .NET specific behaviour, so speed is half the
+comparison. See [`docs/system-uri-differences.md`](../../system-uri-differences.md).
 
 **Three shipped RIDs are missing.** `linux-musl-x64`, `linux-musl-arm64` and `osx-x64` have no
-hosted runner this harness can use. The musl natives are built from the same source with the
-same flags as their glibc counterparts, so the glibc rows are the closest available guide, not
-a measurement.
+hosted runner this harness can use. The musl natives come from the same source and flags as their
+glibc counterparts, so the glibc rows are a guide, not a measurement.
 
 ## What changed since 0.1.0-beta.1
 
-**Windows x64 got faster, and the size of it is larger than ADR-0006 predicted.** 0.1.0-beta.1
-shipped without `/GL` and `/LTCG`; 0.1.0 generates the export list from `ada_c.h` and turns both
-back on. W2 moved from `1.13x`, `1.14x` and `1.25x` to `1.00x`, `1.03x` and `1.07x`, a 10 to 14
-percent reduction. [ADR-0006](../../adr/0006-generated-export-list-and-whole-program-optimisation-on-windows.md)
-measured 6 to 8 percent on that category from a single runner.
+Put the two runs side by side and everything looks faster. Most of it is not the build.
 
-W1 moved too, from `1.01x` and `1.10x` to `0.88x` and `1.00x`. ADR-0006 found W1 to be noise, so
-do not attribute that to the optimisation. The runs are ten days apart on different runner
-hardware, and the gap between the two explanations is not resolvable from these numbers.
+The runs are ten days apart on different hardware, .NET 10.0.11 against 10.0.12, and
+BenchmarkDotNet 0.15.2 against 0.15.8. Linux x64 is the control: its build did not change between
+the two releases, because Linux already compiled with `-flto=thin`.
 
-**`W0 validate` is now populated.** beta.1 warned that its `CanParse` row was measured against
-`new Uri()` plus three component reads, which is validation against parsing. The correct
-baseline is `Uri.TryCreate` with the result discarded, and against that `CanParse` runs `0.54x`
-to `0.79x`.
+| Category | Row | Linux x64 | Windows x64 |
+| --- | --- | ---: | ---: |
+| W1 | span in, span out | 0.52x to 0.36x | 1.01x to 0.88x |
+| W1 | read every component | 0.59x to 0.45x | 1.10x to 1.00x |
+| W2 | normalize | 0.67x to 0.68x | 1.13x to 1.00x |
+| W2 | span in, span out | 0.67x to 0.66x | 1.14x to 1.03x |
 
-**Windows arm64 is measured for the first time.** Cross compiled on `windows-2022`, benchmarked
-on `windows-11-arm`. It sits between Windows x64 and the Linux platforms on the parse path and
-behind both on transcode.
+W1 moved further on the platform whose build did not change. So the Windows W1 figure is the
+runner and the runtime, not the optimisation.
+[ADR-0006](../../adr/0006-generated-export-list-and-whole-program-optimisation-on-windows.md)
+reached the same conclusion from a controlled A/B on one machine.
 
-**`ReuseHandleAndReadHostname` is new in W4.** It answers what a kept handle saves over parsing
-into a fresh one, which is the mitigation ADR-0007 documents for the Windows allocator gap. On
-Windows x64 it costs `2.48x` to `2.78x` a validation where `ParseAndReadHostname` costs `2.88x`
-to `3.11x`.
+W2 is the real result. Flat on Linux, 10 percent on Windows, and the only difference between
+those two platforms is that 0.1.0 generates the Windows export list and compiles with `/GL` and
+`/LTCG`. ADR-0006 measured 6 to 8 percent for that change. This agrees with it.
+
+Three other things are new. `W0 validate` is populated, so `CanParse` finally has
+`Uri.TryCreate` as its baseline instead of a full parse, and runs `0.54x` to `0.79x` against it.
+`win-arm64` is measured at all. `ReuseHandleAndReadHostname` gives the ADR-0007 mitigation a
+published figure: `2.48x` to `2.78x` a validation on Windows x64, against `2.88x` to `3.11x` for
+a fresh parse.
 
 ## Two rows have no baseline marker on Windows x64
 
-`Ada_Basic_T1_ReadEveryComponent` and `Ada_Complex_T1_Normalize` both print `1.00x` on Windows
-x64, and so does the `System.Uri` row they are measured against. That is a real result:
-158.90 ns against 158.15 ns in W1. It is not a formatting fault, and neither row is the baseline.
+`Ada_Basic_T1_ReadEveryComponent` and `Ada_Complex_T1_Normalize` print `1.00x` on Windows x64,
+and so does the `System.Uri` row they are measured against. That is a real result, 158.90 ns
+against 158.15 ns, not a formatting fault. Neither row is the baseline.
 
 ## A caveat on the Windows figures
 
-[Issue #45](https://github.com/sanamhub/ada-csharp/issues/45) records that the Windows natives
-are a function of the runner image: the same source and the same compiler version produce one of
-two different binaries depending on which image the build lands on. These numbers describe the
-released bytes, because the cache served them. A rebuild on a different image may not be the same
-binary, and would need measuring again.
+[Issue #45](https://github.com/sanamhub/ada-csharp/issues/45) records that the Windows natives are
+a function of the runner image: the same source and compiler version produce one of two binaries
+depending on which image the build lands on. These numbers describe the released bytes, because
+the cache served them. A rebuild elsewhere may not be the same binary.
 
 ## TranscodeBenchmarks
 

@@ -10,9 +10,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Published benchmark results for 0.1.0, in `docs/benchmarks/0.1.0/`, covering the five platforms
   with a hosted runner. Every native in the run was a cache hit whose sha256 matches
   `native/CHECKSUMS.txt`, so the numbers describe the released bytes rather than a rebuild.
-  Windows arm64 is measured for the first time, and Windows x64 is about 12 percent ahead of
-  `System.Uri` on a plain URL through the span path where 0.1.0-beta.1 was level, which is the
-  export list and `/GL` change from ADR-0006 arriving in a published figure.
+  Windows arm64 is measured for the first time. The export list and `/GL` change from ADR-0006
+  shows up as 10 percent on W2, flat on Linux over the same pair of runs, which is the control
+  that makes it attributable. W1 improved on Windows too, but improved further on Linux with no
+  build change, so the page credits that to the runner rather than to the optimisation.
 - `linux-musl-arm64`. Alpine on arm64 got a `DllNotFoundException` for a reason that had nothing
   to do with the caller's code. Built by the existing `build-musl.sh` on an arm64 runner, and the
   consumption test runs in an Alpine container on arm64, so the library is loaded on the platform

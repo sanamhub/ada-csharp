@@ -241,8 +241,9 @@ The two parsers do not implement the same specification, so speed is only half o
 If speed is what you are here for and you deploy on Windows, benchmark your own traffic before
 switching. The honest summary for Windows x64 in 0.1.0: about 12 percent ahead of `System.Uri`
 on a plain URL through the span path, level on a hard one, no garbage either way, different
-specification. That is better than 0.1.0-beta.1, where it was level on both, because the Windows
-build now generates its export list and compiles with `/GL` and `/LTCG`.
+specification. Generating the export list and compiling with `/GL` is worth about 10 percent of
+that on a hard URL. The plain URL figure improved against 0.1.0-beta.1 as well, but Linux
+improved more on the same row with no build change at all, so read that one as the runner.
 
 Full results for all five benchmarked platforms, the thousand URL batch workload and the UTF-16
 transcode cost by input length are in
