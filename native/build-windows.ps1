@@ -35,7 +35,13 @@ param(
     # all-symbols is upstream's WINDOWS_EXPORT_ALL_SYMBOLS, exporting every mangled C++ symbol in
     # the library with no whole program optimisation. Kept so the comparison can be rerun, which
     # #18 will want when the pinned tag moves.
-    [ValidateSet('def', 'all-symbols')][string]$Exports = 'def'
+    [ValidateSet('def', 'all-symbols')][string]$Exports = 'def',
+
+    # auto ties whole program optimisation to -Exports, which is the shipping behaviour: def
+    # implies it, all-symbols cannot have it. on and off override that, and the only reason they
+    # exist is #45. Whether /GL is what makes the Windows output track the runner image needs
+    # def exports with /GL off, and auto cannot express that combination.
+    [ValidateSet('auto', 'on', 'off')][string]$Ipo = 'auto'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -150,7 +156,20 @@ if ($Exports -eq 'def') {
 # /GL, so MSBuild sets WholeProgramOptimization on the compile and LinkTimeCodeGeneration on the
 # link together. Setting one by hand and forgetting the other is LNK1257 at the end of a long
 # build.
-$ipo = if ($Exports -eq 'def') { 'ON' } else { 'OFF' }
+# Not $ipo: PowerShell variable names are case insensitive, so that would be the $Ipo parameter
+# and this would overwrite the argument it is reading.
+$ipoValue = switch ($Ipo) {
+    'on'  { 'ON' }
+    'off' { 'OFF' }
+    default { if ($Exports -eq 'def') { 'ON' } else { 'OFF' } }
+}
+
+# all-symbols leaves WINDOWS_EXPORT_ALL_SYMBOLS on, so cmake -E __create_def reads the compiled
+# objects, and under /GL those hold IL and it dies with 0xC0000005. Refuse the combination here
+# rather than an hour into a build with an access violation and no explanation. ADR-0006.
+if ($Exports -eq 'all-symbols' -and $ipoValue -eq 'ON') {
+    throw "-Exports all-symbols cannot be combined with -Ipo on: cmake -E __create_def crashes on IL objects. See ADR-0006."
+}
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
 
@@ -160,7 +179,7 @@ $cmakeArgs = @(
     '-DBUILD_SHARED_LIBS=ON',
     '-DADA_TESTING=OFF', '-DADA_BENCHMARKS=OFF', '-DADA_TOOLS=OFF',
     '-DADA_USE_SIMDUTF=OFF',
-    "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=$ipo",
+    "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=$ipoValue",
     '-DCMAKE_CXX_STANDARD=20', '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
     '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL',
     "-DCMAKE_CXX_FLAGS_RELEASE=$cxxFlags",
@@ -187,7 +206,7 @@ if ($injects.Count -gt 0) {
     $cmakeArgs += "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$list"
 }
 
-Write-Output "configuring $Rid with arch=$arch exports=$Exports ipo=$ipo"
+Write-Output "configuring $Rid with arch=$arch exports=$Exports ipo=$ipoValue"
 
 cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed with exit code $LASTEXITCODE" }
