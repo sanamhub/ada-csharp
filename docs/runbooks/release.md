@@ -14,24 +14,16 @@
    without one stops the release, and every builds-are-not-reproducible workaround ends with
    somebody regenerating it on autopilot, which is exactly the habit an attacker relies on.
 
-   The Linux and macOS RIDs are reproducible: the same source and flags give byte identical
-   output. The `reproducible build` workflow checks `linux-x64` and `linux-musl-arm64` weekly by
-   building each twice from scratch, as samples rather than as full coverage. Windows needs
-   `/Brepro` and `/PDBALTPATH` to get that far, since MSVC otherwise stamps the build time and a
-   fresh PDB signature into every binary.
+   Every RID is reproducible: the same source and flags give byte identical output. Windows needs
+   `/Brepro` and `/PDBALTPATH`, since MSVC otherwise stamps the build time and a fresh PDB
+   signature into every binary, and it needs `/GL` off, since whole program optimisation makes
+   the output track the runner image. See ADR-0010 and ADR-0011. The `reproducible build` workflow
+   checks four RIDs weekly by building each twice in one job, as a sample. It cannot see drift
+   across runner images; `win-drift.yml` can.
 
-   **The two Windows RIDs are not reproducible across runner images, and the manifest does not
-   currently gate them.** `/GL` and `/LTCG` make MSVC produce different output on different GitHub
-   runner images from identical source and identical compiler versions. See ADR-0010. So a Windows
-   checksum mismatch has two possible causes and they look the same.
-
-   If a Windows checksum fails, read the runner image version out of the failing job before
-   touching this file. If it differs from the image that produced the committed hash, that is the
-   known problem and not a substitution. If it is the same image, stop and treat it as a real
-   mismatch, because the output is stable within an image.
-
-   `reproducible build` cannot see this: it builds twice inside one job on one machine, so it
-   catches embedded timestamps and nothing about images.
+   If a checksum fails, treat it as a real mismatch until shown otherwise. For a Windows RID, run
+   `win-drift.yml` before touching this file: if the `ipo=off` hash moved with the runner image,
+   that is new evidence against ADR-0011 and needs a decision, not a regenerated manifest.
 4. `PublicAPI.Unshipped.txt` entries are moved to `PublicAPI.Shipped.txt` for a stable release.
 5. CI is green on `main`.
 
@@ -50,7 +42,7 @@ That triggers `release.yml`:
 | Job | What it does |
 | --- | --- |
 | `preflight` | Checks the tag, the project version and the changelog agree. Seconds. |
-| `natives` | Builds all seven native libraries from the pinned upstream Ada tag. |
+| `natives` | Builds all eight native libraries from the pinned upstream Ada tag. |
 | `verify` | Packs with the completeness gate active and consumes the package from a clean project on five platforms, Alpine included. |
 | `publish` | Waits on the `production` environment approval, then verifies checksums, packs, builds the SBOM, pushes to nuget.org, and creates the GitHub release. |
 | `verify published` | Called by `release.yml` after `publish`. Waits for nuget.org validation, then installs the package from the live feed on five platforms. |
