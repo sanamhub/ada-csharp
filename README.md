@@ -117,11 +117,12 @@ is not the answer. This README used to say it was.
 
 It used to be off, because Ada has no `__declspec(dllexport)`, so the export list came from
 `cmake -E __create_def`, which crashes on the IL objects `/GL` produces. Generating the export
-list from Ada's own `ada_c.h` takes that step out of the build, so `/GL` and `/LTCG` are on now.
-Measured, the two together are worth about 7% on a hard URL, nothing measurable on a plain one,
-and a 43% smaller DLL. They changed at once, so neither half can claim the 7% on its own. Worth
-having, nowhere near the factor of two this README once implied. The numbers are in
-[#18](https://github.com/sanamhub/ada-csharp/issues/18) and the decision in ADR-0006.
+list from Ada's own `ada_c.h` takes that step out of the build, which made `/GL` and `/LTCG`
+possible, and 0.1.0 shipped with them. The export list stays: it makes the DLL 43% smaller.
+From 0.1.1 `/GL` is off again. With it on, MSVC produces different bytes on different runner
+images from identical sources, so the committed checksum cannot tell a new image from a swapped
+binary. That costs 4 to 13 percent on `CanParse` and 3 to 5 percent on a hard URL. The numbers
+are in [#45](https://github.com/sanamhub/ada-csharp/issues/45), the decision in ADR-0011.
 
 Upstream's `src/ada.cpp` includes every other `.cpp`, so the library is a single translation unit
 and there was never much for whole program optimisation to inline across.

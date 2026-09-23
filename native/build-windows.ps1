@@ -20,28 +20,29 @@
     MultiThreadedDLL matches the CRT that .NET processes already load. A static CRT inside a DLL
     sitting next to .NET is a heap mismatch waiting to happen.
 
-    -Exports defaults to def: the export list is generated from upstream's include/ada_c.h and
-    whole program optimisation is on. That is measured, not assumed. See ADR-0006 and #18.
+    -Exports defaults to def: the export list is generated from upstream's include/ada_c.h. See
+    ADR-0006 and #18. Whole program optimisation is off, because with it on the output tracks the
+    runner image and native/CHECKSUMS.txt cannot gate the binary. See ADR-0011 and #45.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$AdaTag,
     [ValidateSet('win-x64', 'win-arm64')][string]$Rid = 'win-x64',
 
-    # def generates an export list from upstream's include/ada_c.h, exports only the ada_* C API,
-    # and lets /GL back in. It is the default because it measured 7% faster on the hard URL path
-    # and halves the DLL. See ADR-0006.
+    # def generates an export list from upstream's include/ada_c.h and exports only the ada_* C
+    # API. It is the default because it halves the DLL and is the only export mode /GL can be
+    # combined with. See ADR-0006.
     #
     # all-symbols is upstream's WINDOWS_EXPORT_ALL_SYMBOLS, exporting every mangled C++ symbol in
     # the library with no whole program optimisation. Kept so the comparison can be rerun, which
     # #18 will want when the pinned tag moves.
     [ValidateSet('def', 'all-symbols')][string]$Exports = 'def',
 
-    # auto ties whole program optimisation to -Exports, which is the shipping behaviour: def
-    # implies it, all-symbols cannot have it. on and off override that, and the only reason they
-    # exist is #45. Whether /GL is what makes the Windows output track the runner image needs
-    # def exports with /GL off, and auto cannot express that combination.
-    [ValidateSet('auto', 'on', 'off')][string]$Ipo = 'auto'
+    # off ships. /GL and /LTCG make MSVC produce different bytes on different runner images from
+    # identical sources and component versions, so a committed hash cannot tell a new image from
+    # a substituted binary. on is kept so win-perf-experiment.yml and win-drift.yml can rerun the
+    # comparison. It costs 4 to 13 percent on CanParse. See ADR-0010, ADR-0011 and #45.
+    [ValidateSet('on', 'off')][string]$Ipo = 'off'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -109,10 +110,8 @@ function New-AdaExportsDef {
 # and __create_def dies with 0xC0000005 reading them. It crashed on simdutf first, then on
 # ada.vcxproj once simdutf was turned off, so it is /GL and not the dependency.
 #
-# A .def file takes __create_def out of the build, which takes the crash with it. Whether /GL
-# then buys anything is the open question: upstream's src/ada.cpp includes every other .cpp, so
-# the library is one translation unit and whole program optimisation has nothing to cross. The
-# CRT is dynamic, so there is no CRT LTCG either. #18 measures it.
+# A .def file takes __create_def out of the build, which takes the crash with it, so /GL becomes
+# possible. It does not ship: see the -Ipo parameter above.
 #
 # /OPT:REF and /OPT:ICF run either way.
 #
@@ -158,11 +157,7 @@ if ($Exports -eq 'def') {
 # build.
 # Not $ipo: PowerShell variable names are case insensitive, so that would be the $Ipo parameter
 # and this would overwrite the argument it is reading.
-$ipoValue = switch ($Ipo) {
-    'on'  { 'ON' }
-    'off' { 'OFF' }
-    default { if ($Exports -eq 'def') { 'ON' } else { 'OFF' } }
-}
+$ipoValue = if ($Ipo -eq 'on') { 'ON' } else { 'OFF' }
 
 # all-symbols leaves WINDOWS_EXPORT_ALL_SYMBOLS on, so cmake -E __create_def reads the compiled
 # objects, and under /GL those hold IL and it dies with 0xC0000005. Refuse the combination here
