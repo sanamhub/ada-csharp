@@ -33,7 +33,7 @@ jobs:
           - { rid: linux-x64, os: ubuntu-24.04, lib: libada.so }
           - { rid: linux-musl-arm64, os: ubuntu-24.04-arm, lib: libada.so }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: install build tools
         if: runner.os == 'Linux'
