@@ -20,9 +20,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to do with the caller's code. Built by the existing `build-musl.sh` on an arm64 runner, and the
   consumption test runs in an Alpine container on arm64, so the library is loaded on the platform
   it targets rather than assumed to work because it compiled. ADR-0009.
+- `SECURITY.md` added, pointing vulnerability reports at private GitHub security advisories.
 
 ### Changed
 
+- README rewritten as a short consumer page. Its links are absolute, because the README ships in
+  the package and relative links were broken on nuget.org. Benchmark detail moved to
+  `docs/performance.md`.
 - Windows natives build without `/GL` and `/LTCG`, so both Windows binaries are byte identical
   across runner images and `native/CHECKSUMS.txt` gates them again. With them on, MSVC produced
   different bytes on different images from identical sources and component versions, and a
