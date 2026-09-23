@@ -89,7 +89,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           $catalogue = [ordered]@{
-              a = @{ name = 'a-msvc-allsymbols'; exports = 'all-symbols'; ipo = 'auto' }
+              a = @{ name = 'a-msvc-allsymbols'; exports = 'all-symbols'; ipo = 'off'  }
               b = @{ name = 'b-msvc-def-gl';     exports = 'def';         ipo = 'on'   }
               c = @{ name = 'c-msvc-def-nogl';   exports = 'def';         ipo = 'off'  }
           }

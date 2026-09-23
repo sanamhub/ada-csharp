@@ -21,11 +21,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- `native/build-windows.ps1` takes `-Ipo auto|on|off`. `auto` is the previous behaviour and is
-  what ships, so no released binary changes. The override exists because whole program
-  optimisation was tied to `-Exports`, and the question in #45 needs `def` exports with `/GL` off,
-  which that coupling could not express. `all-symbols` with `/GL` is refused up front, since it
-  dies in `cmake -E __create_def` on IL objects.
+- Windows natives build without `/GL` and `/LTCG`, so both Windows binaries are byte identical
+  across runner images and `native/CHECKSUMS.txt` gates them again. With them on, MSVC produced
+  different bytes on different images from identical sources and component versions, and a
+  release had roughly a coin flip per Windows RID of failing its checksum step for an innocent
+  reason. Costs 4 to 13 percent on `CanParse` and 3 to 5 percent on a hard URL. `CanParse` stays
+  well ahead of `Uri.TryCreate`. The generated export list stays. ADR-0011, #45.
+- `native/build-windows.ps1` takes `-Ipo on|off`, default `off`. `on` exists so the comparison can
+  be rerun. `all-symbols` with `/GL` is refused up front, since it dies in `cmake -E __create_def`
+  on IL objects.
 - `win-perf-experiment.yml` gains variant `c`, a pure `/GL` comparison, and a RID input so
   `win-arm64` can be measured on `windows-11-arm`. Variant `a` moves exports and `/GL` together,
   so #18's 7 percent covers the pair rather than `/GL` alone.
