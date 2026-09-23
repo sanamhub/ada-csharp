@@ -52,7 +52,7 @@ jobs:
           - { name: win-x64,        os: windows-2022,     container: '' }
           - { name: win-arm64,      os: windows-11-arm,   container: '' }
           - { name: linux-musl-x64, os: ubuntu-24.04,     container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
-          - { name: linux-musl-arm64, os: ubuntu-24.04-arm, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
+          - { name: linux-musl-arm64, os: ubuntu-24.04-arm, container: '', alpine: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
           # osx-x64 needs an Intel host, and macos-13 queues for tens of minutes. nightly.yml
           # covers it, where waiting costs nothing.
     steps:
@@ -69,6 +69,7 @@ jobs:
           global-json-file: global.json
 
       - name: verify the published package
+        if: ${{ !matrix.alpine }}
         shell: bash
         run: |
           set -euo pipefail
@@ -78,3 +79,14 @@ jobs:
           # nuget.org documents validation and indexing as taking up to an hour, and this workflow
           # fires the moment the release is created, so waiting is the expected path.
           ./tests/packaging/verify-published.sh --version "$version" --wait-minutes 75
+
+      # GitHub runs JavaScript actions inside an Alpine container on x64 runners only, so the
+      # arm64 musl leg cannot use `container:`. It stays on the host and runs this one step in
+      # Alpine instead, which is the part that has to happen on musl.
+      - name: verify the published package in Alpine
+        if: ${{ matrix.alpine }}
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          docker run --rm -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT -v "$PWD:/w" -w /w '${{ matrix.alpine }}' \
+            sh -c "apk add --no-cache bash curl && ./tests/packaging/verify-published.sh --version '${version#v}' --wait-minutes 75"
