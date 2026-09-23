@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/sanamhub/ada-csharp/security/advisories/new
+    about: Report privately. Do not open a public issue.
+  - name: URL parsing bug that upstream Ada also has
+    url: https://github.com/ada-url/ada/issues
+    about: Parsing results come from Ada. Report those there.
+  - name: API reference
+    url: https://github.com/sanamhub/ada-csharp/wiki
+    about: Documentation for every public type and method.

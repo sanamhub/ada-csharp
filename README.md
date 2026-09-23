@@ -70,6 +70,8 @@ AdaIdna.ToUnicode("xn--bcher-kva.example");   // bücher.example
 
 `ReadOnlySpan<byte>` (UTF-8) is the primary API. `string` overloads exist and pay a transcode.
 
+Every public type and method, with examples, is in the [API reference](https://github.com/sanamhub/ada-csharp/wiki).
+
 ## Why not `System.Uri`
 
 `System.Uri` implements RFC 3986 and 3987 plus .NET specific behaviour. It is not WHATWG
@@ -149,12 +151,15 @@ dotnet test  -c Release
 ```
 
 The tests need the native library. CI builds it; locally, build it with the scripts in `native/`,
-which need a C++ toolchain and CMake.
+which need a C++ toolchain and CMake. See
+[`CONTRIBUTING.md`](https://github.com/sanamhub/ada-csharp/blob/main/CONTRIBUTING.md) for the
+steps and the pull request rules.
 
 ## Documentation
 
 | Link | Contents |
 | --- | --- |
+| [API reference](https://github.com/sanamhub/ada-csharp/wiki) | Every public type and method, with examples |
 | [`docs/performance.md`](https://github.com/sanamhub/ada-csharp/blob/main/docs/performance.md) | Benchmarks and what they mean |
 | [`docs/system-uri-differences.md`](https://github.com/sanamhub/ada-csharp/blob/main/docs/system-uri-differences.md) | Every disagreement with `System.Uri` |
 | [`docs/adr/`](https://github.com/sanamhub/ada-csharp/tree/main/docs/adr) | Architecture decision records |
