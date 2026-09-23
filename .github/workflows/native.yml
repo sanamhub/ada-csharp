@@ -50,8 +50,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.rids || '[{"rid":"win-x64","os":"windows-2022"},{"rid":"win-arm64","os":"windows-2022"},{"rid":"linux-x64","os":"ubuntu-24.04"},{"rid":"linux-arm64","os":"ubuntu-24.04-arm"},{"rid":"linux-musl-x64","os":"ubuntu-24.04"},{"rid":"linux-musl-arm64","os":"ubuntu-24.04-arm"},{"rid":"osx-x64","os":"macos-14"},{"rid":"osx-arm64","os":"macos-14"}]') }}
     steps:
-      # TODO: pin these to full commit SHAs before the first release.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Keyed on everything that decides what the binary is, and nothing that does not.
       #
@@ -72,7 +71,7 @@ jobs:
         shell: bash
         run: echo "k=native-${ADA_TAG}-${{ matrix.rid }}-${{ hashFiles('native/build-linux.sh', 'native/build-macos.sh', 'native/build-musl.sh', 'native/build-windows.ps1', 'native/cmake/*.cmake') }}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cache
         with:
           path: artifacts/native/${{ matrix.rid }}
@@ -138,7 +137,7 @@ jobs:
         shell: bash
         run: ./native/checksum.sh artifacts/native/${{ matrix.rid }} | tee checksums-${{ matrix.rid }}.txt
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-${{ matrix.rid }}
           path: |
@@ -146,7 +145,7 @@ jobs:
             !artifacts/native/${{ matrix.rid }}/*.unstripped
           retention-days: 7
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: checksums-${{ matrix.rid }}
           path: checksums-${{ matrix.rid }}.txt
@@ -158,14 +157,14 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: checksums-*
           path: sums
           merge-multiple: true
       - name: combine
         run: cat sums/*.txt | sort -k2 | tee CHECKSUMS.txt
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: checksums
           path: CHECKSUMS.txt

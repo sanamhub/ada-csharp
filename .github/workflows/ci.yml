@@ -51,14 +51,13 @@ jobs:
           - { os: ubuntu-24.04-arm, rid: linux-arm64 }
           - { os: macos-14,         rid: osx-arm64   }
     steps:
-      # TODO(P1): pin third-party actions by full commit SHA (org section 7 supply chain).
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
       - name: download native
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: native-${{ matrix.rid }}
           path: artifacts/native/${{ matrix.rid }}
@@ -112,7 +111,7 @@ jobs:
 
       - name: upload the difference report
         if: matrix.rid == 'linux-x64'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: system-uri-differences
           path: docs/system-uri-differences.md
@@ -120,7 +119,7 @@ jobs:
 
       - name: upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results-${{ matrix.rid }}
           path: TestResults
@@ -134,12 +133,12 @@ jobs:
     needs: natives
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: native-*
           path: artifacts/native
@@ -166,7 +165,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
           ./tests/packaging/verify-package.sh --package-dir out --rid linux-x64 --aot
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nupkg
           path: out/*.nupkg
@@ -179,15 +178,15 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           languages: csharp
       - run: dotnet build -c Release
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
 
   deps:
     name: dependency review
@@ -197,7 +196,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Blocks a merge on a critical or high advisory without a recorded risk decision.
       #
       # continue-on-error until the action is confirmed working on this repo. It failed on all
@@ -205,7 +204,7 @@ jobs:
       # action erroring rather than reporting a finding. It needs the repository Dependency
       # graph enabled to call the dependency-graph compare API. Once a run produces a real
       # report, drop continue-on-error and add this job back to branch protection.
-      - uses: actions/dependency-review-action@v5
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         continue-on-error: true
         with:
           fail-on-severity: high

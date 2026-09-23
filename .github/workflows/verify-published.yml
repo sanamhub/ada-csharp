@@ -56,14 +56,14 @@ jobs:
           # osx-x64 needs an Intel host, and macos-13 queues for tens of minutes. nightly.yml
           # covers it, where waiting costs nothing.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: alpine prerequisites
         if: matrix.container != ''
         shell: sh
         run: apk add --no-cache bash curl
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         if: matrix.container == ''
         with:
           global-json-file: global.json

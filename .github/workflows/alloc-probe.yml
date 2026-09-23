@@ -31,7 +31,7 @@ jobs:
           - { os: windows-2022, label: win-x64   }
           - { os: ubuntu-24.04, label: linux-x64 }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The amalgamation, not the repository, because the probe needs one translation unit and
       # no build system. src/ada.cpp includes ada_c.cpp, so the release asset carries the C API.
@@ -82,7 +82,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: alloc-probe-${{ matrix.label }}
           path: probe/result.txt
