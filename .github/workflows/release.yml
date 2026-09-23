@@ -73,7 +73,7 @@ jobs:
           # A glibc .so will not load on Alpine, so this leg is what proves the musl RID is real
           # rather than assumed. AC-2.5.
           - { name: linux-musl-x64, os: ubuntu-24.04,     rid: linux-musl-x64, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
-          - { name: linux-musl-arm64, os: ubuntu-24.04-arm, rid: linux-musl-arm64, container: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
+          - { name: linux-musl-arm64, os: ubuntu-24.04-arm, rid: linux-musl-arm64, container: '', alpine: 'mcr.microsoft.com/dotnet/sdk:10.0-alpine' }
           #
           # osx-x64 is deliberately absent. Running an x86_64 binary needs an Intel host, and
           # macos-13 has queued 20 to 40 minutes on every attempt, blocking everything behind it
@@ -114,8 +114,19 @@ jobs:
         run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out
 
       - name: consume the package
+        if: ${{ !matrix.alpine }}
         shell: bash
         run: ./tests/packaging/verify-package.sh --package-dir out --rid ${{ matrix.rid }}
+
+      # GitHub runs JavaScript actions inside an Alpine container on x64 runners only, so the
+      # arm64 musl leg cannot use `container:`. It stays on the host and runs this one step in
+      # Alpine instead, which is the part that has to happen on musl.
+      - name: consume the package in Alpine
+        if: ${{ matrix.alpine }}
+        shell: bash
+        run: |
+          docker run --rm -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT -v "$PWD:/w" -w /w '${{ matrix.alpine }}' \
+            sh -c 'apk add --no-cache bash python3 && ./tests/packaging/verify-package.sh --package-dir out --rid ${{ matrix.rid }}'
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: matrix.rid == 'linux-x64'
