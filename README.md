@@ -51,26 +51,10 @@ url.Search;          // ?q=1
 url.HasCredentials;  // true
 ```
 
-**Query strings**, enumerated without allocating:
-
-```csharp
-using var parameters = AdaSearchParams.Parse("key1=value1&key2=value2"u8);
-foreach (AdaSearchParams.Entry entry in parameters)
-{
-    // entry.Key and entry.Value are borrowed spans
-}
-```
-
-**Internationalised domains:**
-
-```csharp
-AdaIdna.ToAscii("Bücher.example");            // xn--bcher-kva.example
-AdaIdna.ToUnicode("xn--bcher-kva.example");   // bücher.example
-```
-
 `ReadOnlySpan<byte>` (UTF-8) is the primary API. `string` overloads exist and pay a transcode.
 
-Every public type and method, with examples, is in the [API reference](https://github.com/sanamhub/ada-csharp/wiki).
+Query strings (`AdaSearchParams`), internationalised domains (`AdaIdna`) and every other public
+type are in the [API reference](https://github.com/sanamhub/ada-csharp/wiki), with examples.
 
 ## Why not `System.Uri`
 
@@ -143,18 +127,6 @@ and arm64.
 | Setter behaviour | 278 | all pass |
 | **Total** | **1,152** | **all pass** |
 
-## Building from source
-
-```bash
-dotnet build -c Release
-dotnet test  -c Release
-```
-
-The tests need the native library. CI builds it; locally, build it with the scripts in `native/`,
-which need a C++ toolchain and CMake. See
-[`CONTRIBUTING.md`](https://github.com/sanamhub/ada-csharp/blob/main/CONTRIBUTING.md) for the
-steps and the pull request rules.
-
 ## Documentation
 
 | Link | Contents |
@@ -166,6 +138,7 @@ steps and the pull request rules.
 | [`docs/ADA_PLAN.md`](https://github.com/sanamhub/ada-csharp/blob/main/docs/ADA_PLAN.md) | Original design plan |
 | [`docs/runbooks/release.md`](https://github.com/sanamhub/ada-csharp/blob/main/docs/runbooks/release.md) | Releasing and rolling back |
 | [`CHANGELOG.md`](https://github.com/sanamhub/ada-csharp/blob/main/CHANGELOG.md) | Release history |
+| [`CONTRIBUTING.md`](https://github.com/sanamhub/ada-csharp/blob/main/CONTRIBUTING.md) | Building from source, including the native library, and pull request rules |
 
 ## License
 
