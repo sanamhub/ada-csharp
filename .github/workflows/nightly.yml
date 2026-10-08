@@ -41,7 +41,6 @@ jobs:
 
       - name: run the conformance suite under the sanitizers
         env:
-          LSAN_OPTIONS: detect_leaks=1
           # alloc_dealloc_mismatch=0: preloading ASan makes it see the .NET runtime's own
           # allocations as well, and coreclr deliberately frees some malloc'd memory with
           # operator delete. That mismatch is runtime noise, not a libada bug.
@@ -51,8 +50,9 @@ jobs:
           # The leak gate and the buffer/use-after-free checks stay on.
           ASAN_OPTIONS: abort_on_error=1:alloc_dealloc_mismatch=0
           # The .NET runtime allocates in ways LSAN reports but we do not own. Only frames from
-          # the native library and this library's interop are actionable.
-          LSAN_SUPPRESSIONS: ${{ github.workspace }}/native/lsan.supp
+          # the native library and this library's interop are actionable. Suppressions go through
+          # LSAN_OPTIONS, not the LSAN_SUPPRESSIONS variable, which gcc's libasan ignores.
+          LSAN_OPTIONS: detect_leaks=1:suppressions=${{ github.workspace }}/native/lsan.supp
         run: |
           # The sanitized libada.so is dlopen'd by the .NET host, so the sanitizer runtime is
           # not the first library in the image. ASan refuses to initialise in that position, and
