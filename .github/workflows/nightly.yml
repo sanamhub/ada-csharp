@@ -44,9 +44,12 @@ jobs:
           LSAN_OPTIONS: detect_leaks=1
           # alloc_dealloc_mismatch=0: preloading ASan makes it see the .NET runtime's own
           # allocations as well, and coreclr deliberately frees some malloc'd memory with
-          # operator delete. That mismatch is runtime noise, not a libada bug. The leak gate
-          # and the buffer/use-after-free checks stay on.
-          ASAN_OPTIONS: detect_stack_use_after_return=1:abort_on_error=1:print_stats=1:alloc_dealloc_mismatch=0
+          # operator delete. That mismatch is runtime noise, not a libada bug.
+          #
+          # detect_stack_use_after_return is left off (the default): coreclr switches and
+          # rewrites stacks for GC, and the fake-stack this option installs hangs the host.
+          # The leak gate and the buffer/use-after-free checks stay on.
+          ASAN_OPTIONS: abort_on_error=1:alloc_dealloc_mismatch=0
           # The .NET runtime allocates in ways LSAN reports but we do not own. Only frames from
           # the native library and this library's interop are actionable.
           LSAN_SUPPRESSIONS: ${{ github.workspace }}/native/lsan.supp
