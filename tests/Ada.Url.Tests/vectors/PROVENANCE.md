@@ -7,16 +7,16 @@ These files come from [web-platform-tests](https://github.com/web-platform-tests
 | --- | --- |
 | Upstream | `web-platform-tests/wpt` |
 | Path | `url/resources/` |
-| Pinned commit | `509e6fa4bc34de46802aae59ff103b87caa426a0` |
-| Commit date | 2026-07-14 |
-| Retrieved | 2026-08-26 |
+| Pinned commit | `13748c36fdf9dd77cd0b34dd6b244256b365ea60` |
+| Commit date | 2026-10-04 |
+| Retrieved | 2026-10-08 |
 | Upstream license | See the wpt repository. The corpus is published for exactly this use. |
 
 ## Files
 
 | File | Size | Covers |
 | --- | --: | --- |
-| `urltestdata.json` | 228 KB | The main parse corpus. Input and base pairs with expected components, or an expected failure. |
+| `urltestdata.json` | 230 KB | The main parse corpus. Input and base pairs with expected components, or an expected failure. |
 | `setters_tests.json` | 82 KB | Per setter behaviour, including which assignments are silently ignored. |
 | `IdnaTestV2.json` | 314 KB | UTS-46 and IDNA conformance. |
 | `toascii.json` | 9 KB | Legacy domain to ASCII cases. |
