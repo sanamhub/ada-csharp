@@ -70,7 +70,11 @@ fi
 # The sanitizer build is for the nightly leak lane, never for a shipped artifact.
 LTO="ON"
 if [ -n "$SANITIZE" ]; then
-  CXX_FLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=$SANITIZE $ARCH_FLAGS"
+  # -fno-sanitize=vptr keeps the vptr check out. It references __ubsan_vptr_type_cache, a
+  # runtime symbol that is not resolved when the shared library is dlopen'd by the .NET host,
+  # and every P/Invoke then throws DllNotFoundException before a single test runs. The check
+  # adds little here anyway: Ada does not do polymorphic dispatch across the C boundary.
+  CXX_FLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=$SANITIZE -fno-sanitize=vptr $ARCH_FLAGS"
   LINK_FLAGS="-fsanitize=$SANITIZE"
   LTO="OFF"
 fi

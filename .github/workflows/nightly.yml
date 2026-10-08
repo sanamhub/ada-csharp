@@ -29,7 +29,9 @@ jobs:
           global-json-file: global.json
 
       - name: install build tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang lld llvm cmake
+        # gcc is here for its shared libasan/libubsan, which clang -print-file-name resolves
+        # and which the test step preloads. The build itself stays on clang.
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang lld llvm cmake gcc
 
       # A separate build of the native library with the sanitizers on. This is the primary
       # native leak gate. Our own code is platform independent, so a leak found here is a leak
@@ -44,7 +46,13 @@ jobs:
           # The .NET runtime allocates in ways LSAN reports but we do not own. Only frames from
           # the native library and this library's interop are actionable.
           LSAN_SUPPRESSIONS: ${{ github.workspace }}/native/lsan.supp
-        run: dotnet test -c Release --filter-trait "Category=Conformance"
+        run: |
+          # The sanitized libada.so is dlopen'd by the .NET host, so the sanitizer runtime is
+          # not the first library in the image. ASan refuses to initialise in that position, and
+          # the UBSan handlers are likewise unresolved until the runtime is loaded. Preload both
+          # shared runtimes so they come first and satisfy every reference.
+          export LD_PRELOAD="$(clang -print-file-name=libasan.so):$(clang -print-file-name=libubsan.so)"
+          dotnet test -c Release --filter-trait "Category=Conformance"
 
   soak:
     name: soak
@@ -79,12 +87,14 @@ jobs:
 
   osx-x64-consumption:
     # The one platform the release cannot verify inline. macos-13 is GitHub's retiring Intel
-    # image and queues for tens of minutes, so it lives here where waiting costs nothing.
+    # image and now queues for a full day before GitHub cancels it, so it can no longer be used
+    # here. The x64 binary is exercised under Rosetta 2 on Apple Silicon instead. It is not a
+    # real Intel host, but it still proves the x64 dylib loads and the interop path runs.
     #
     # The binary itself is cross compiled on Apple Silicon and its architecture is checked with
-    # lipo during the build. What this adds is proof it actually loads and runs on Intel macOS.
+    # lipo during the build. What this adds is proof it actually loads and runs.
     name: osx-x64 consumption
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -102,11 +112,19 @@ jobs:
           brew list ninja >/dev/null 2>&1 || brew install ninja
           ./native/build-macos.sh --ada-tag v4.0.0 --rid osx-x64
 
+      # The consumer is published self-contained for osx-x64 and run under Rosetta 2, because
+      # there is no Intel macOS runner left. Rosetta is not preinstalled on the arm64 image.
+      - name: install Rosetta 2
+        run: |
+          if ! /usr/bin/arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+            sudo softwareupdate --install-rosetta --agree-to-license
+          fi
+
       - name: pack
         run: dotnet pack src/Ada.Url/Ada.Url.csproj -c Release -o out -p:AllowPartialNativePack=true
 
-      - name: consume the package
-        run: ./tests/packaging/verify-package.sh --package-dir out --rid osx-x64
+      - name: consume the package (x64 under Rosetta)
+        run: ./tests/packaging/verify-package.sh --package-dir out --rid osx-x64 --run-rid osx-x64
 
   wpt-drift:
     name: corpus drift

@@ -9,12 +9,14 @@ set -euo pipefail
 
 PACKAGE_DIR=""
 EXPECT_RID=""
+RUN_RID=""
 AOT="false"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --package-dir) PACKAGE_DIR="$2"; shift 2 ;;
     --rid)         EXPECT_RID="$2";  shift 2 ;;
+    --run-rid)     RUN_RID="$2";     shift 2 ;;
     --aot)         AOT="true";       shift 1 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -141,7 +143,17 @@ dotnet restore --verbosity quiet
 
 if [ "$AOT" = "true" ]; then
   echo "publishing with NativeAOT"
-  dotnet publish -c Release -o out --verbosity quiet
+  if [ -n "$RUN_RID" ]; then
+    dotnet publish -c Release -r "$RUN_RID" -o out --verbosity quiet
+  else
+    dotnet publish -c Release -o out --verbosity quiet
+  fi
+  ./out/consumer
+elif [ -n "$RUN_RID" ]; then
+  # Self-contained so the cross-architecture binary carries its own runtime. The host still
+  # needs an emulator (Rosetta 2) when RUN_RID and the runner architecture differ.
+  echo "publishing self-contained for $RUN_RID"
+  dotnet publish -c Release -r "$RUN_RID" --self-contained -o out --verbosity quiet
   ./out/consumer
 else
   dotnet run -c Release --verbosity quiet
