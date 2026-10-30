@@ -137,7 +137,7 @@ jobs:
         shell: bash
         run: ./native/checksum.sh artifacts/native/${{ matrix.rid }} | tee checksums-${{ matrix.rid }}.txt
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-${{ matrix.rid }}
           path: |
@@ -145,7 +145,7 @@ jobs:
             !artifacts/native/${{ matrix.rid }}/*.unstripped
           retention-days: 7
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: checksums-${{ matrix.rid }}
           path: checksums-${{ matrix.rid }}.txt
@@ -164,7 +164,7 @@ jobs:
           merge-multiple: true
       - name: combine
         run: cat sums/*.txt | sort -k2 | tee CHECKSUMS.txt
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: checksums
           path: CHECKSUMS.txt
